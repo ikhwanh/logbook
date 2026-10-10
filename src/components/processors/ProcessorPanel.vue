@@ -36,7 +36,9 @@ const typeLabel = (type: ColumnType) => columnTypes[type].label
 
 const needs = computed(() => {
   const counts = new Map<ColumnType, number>()
-  for (const slot of props.processor.slots) counts.set(slot.type, (counts.get(slot.type) ?? 0) + 1)
+  for (const slot of props.processor.slots) {
+    if (!slot.optional) counts.set(slot.type, (counts.get(slot.type) ?? 0) + 1)
+  }
   const parts = [...counts].map(([type, count]) =>
     count === 1 ? `a ${typeLabel(type)} column` : `${count} ${typeLabel(type)} columns`,
   )
@@ -47,7 +49,7 @@ const slotColumns = computed(() => {
   if (!result.ok) return ''
   return list(
     'and',
-    props.processor.slots.map((slot) => result.columns[slot.key]!.name),
+    props.processor.slots.flatMap((slot) => result.columns[slot.key]?.name ?? []),
   )
 })
 // When a processor needs two columns of a type and the logbook has one, saying
@@ -75,7 +77,8 @@ function choose(slot: Slot, event: Event) {
       <div class="slots">
         <label v-for="slot in processor.slots" :key="slot.key">
           {{ slot.label }}
-          <select :value="binding.columns[slot.key]!.id" @change="choose(slot, $event)">
+          <select :value="binding.columns[slot.key]?.id ?? ''" @change="choose(slot, $event)">
+            <option v-if="slot.optional" value="">None</option>
             <option v-for="column in candidates(slot, logbook)" :key="column.id" :value="column.id">
               {{ column.name }}
             </option>

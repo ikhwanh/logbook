@@ -7,7 +7,7 @@ import { buildExamples } from '../examples'
 import { processors } from '../index'
 import { runStreaks } from '../streaks'
 import { runTimeline, timeline } from '../timeline'
-import { totals } from '../totals'
+import { runTotals, totals, type TotalsResult } from '../totals'
 
 const col = (id: string, type: Column['type']): Column => ({ id, name: id, type })
 
@@ -64,6 +64,20 @@ describe('resolveBinding', () => {
     const result = resolveBinding(chart, logbook([col('d', 'date'), col('note', 'text')]))
     expect(result.ok).toBe(false)
     expect(!result.ok && result.missing.map((s) => s.type)).toEqual(['number'])
+  })
+
+  it('leaves optional slots unbound without blocking the processor', () => {
+    const result = resolveBinding(totals, logbook([col('c', 'select'), col('a', 'number')]))
+    expect(result.ok && Object.keys(result.columns)).toEqual(['category', 'amount'])
+  })
+
+  it('auto-picks optional slots unless None was saved', () => {
+    const columns = [col('c', 'select'), col('a', 'number'), col('t', 'select'), col('d', 'date')]
+    const auto = resolveBinding(totals, logbook(columns))
+    expect(auto.ok && [auto.columns.type?.id, auto.columns.date?.id]).toEqual(['t', 'd'])
+
+    const none = resolveBinding(totals, logbook(columns, { totals: { type: '', date: '' } }))
+    expect(none.ok && [none.columns.type, none.columns.date]).toEqual([undefined, undefined])
   })
 })
 
@@ -139,8 +153,12 @@ describe('timeline', () => {
 })
 
 describe('totals', () => {
+  const category = col('c', 'select')
+  const amount = col('a', 'number')
+  const all = (result: TotalsResult) => result.ranges.find((range) => range.id === 'all')!
+
   it('groups by category, sorted by sum, with uncategorized last', () => {
-    const result = totals.run(
+    const result = runTotals(
       entries([
         { c: 'Food', a: 10 },
         { a: 100 },
@@ -148,14 +166,63 @@ describe('totals', () => {
         { c: 'Food', a: 30 },
         { c: 'Bills' },
       ]),
-      { category: col('c', 'select'), amount: col('a', 'number') },
+      { category, amount },
     )
-    expect(result.groups.map((g) => [g.name, g.sum, g.count])).toEqual([
+    expect(result.ranges.map((range) => range.id)).toEqual(['all'])
+    expect(all(result).income).toBeNull()
+    expect(all(result).expense.groups.map((g) => [g.name, g.sum, g.count])).toEqual([
       ['Bills', 50, 1],
       ['Food', 40, 2],
       ['Uncategorized', 100, 1],
     ])
-    expect(result).toMatchObject({ total: 190, count: 4 })
+    expect(all(result).expense).toMatchObject({ total: 190, count: 4 })
+  })
+
+  it('splits income from expense by the type column', () => {
+    const result = runTotals(
+      entries([
+        { c: 'Salary', t: 'Income', a: 1000 },
+        { c: 'Gift', t: ' income ', a: 200 },
+        { t: 'Income', a: 5 },
+        { c: 'Food', t: 'Expense', a: 30 },
+        { c: 'Food', a: 20 },
+      ]),
+      { category, amount, type: col('t', 'select') },
+    )
+    const { income, expense } = all(result)
+    expect(income!.groups.map((g) => [g.name, g.sum])).toEqual([
+      ['Salary', 1000],
+      ['Gift', 200],
+      ['Uncategorized', 5],
+    ])
+    expect(income).toMatchObject({ total: 1205, count: 3 })
+    expect(expense).toMatchObject({ total: 50, count: 2 })
+  })
+
+  it('filters by date range, counting undated rows only in all time', () => {
+    const result = runTotals(
+      entries([
+        { d: '2026-10-01', a: 1 },
+        { d: '2026-09-15', a: 10 },
+        { d: '2026-01-05', a: 100 },
+        { d: '2025-12-31', a: 1000 },
+        { a: 10000 },
+      ]),
+      { category, amount, date: col('d', 'date') },
+      '2026-10-10',
+    )
+    expect(result.ranges.map((range) => [range.id, range.expense.total])).toEqual([
+      ['month', 1],
+      ['lastMonth', 10],
+      ['last30', 11],
+      ['year', 111],
+      ['all', 11111],
+    ])
+  })
+
+  it('is empty only when no range has rows', () => {
+    expect(totals.isEmpty(runTotals(entries([{ c: 'Food' }]), { category, amount }))).toBe(true)
+    expect(totals.isEmpty(runTotals(entries([{ a: 1 }]), { category, amount }))).toBe(false)
   })
 })
 

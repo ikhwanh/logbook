@@ -26,11 +26,13 @@ export function resolveBinding(processor: Processor, logbook: Logbook): BindingR
   const missing: Slot[] = []
   for (const slot of processor.slots) {
     if (columns[slot.key]) continue
+    // An empty saved choice is the "None" option, which only optional slots offer.
+    if (slot.optional && saved[slot.key] === '') continue
     const column = candidates(slot, logbook).find((c) => !taken.has(c.id))
     if (column) {
       columns[slot.key] = column
       taken.add(column.id)
-    } else {
+    } else if (!slot.optional) {
       missing.push(slot)
     }
   }

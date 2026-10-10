@@ -121,22 +121,41 @@ function expenses(today: string): ExampleTemplate {
       ['Book', 120_000],
     ],
   }
-  const categories = Object.keys(spending)
+  const categories = [...Object.keys(spending), 'Salary', 'Freelance']
   const rows: Record<string, CellValue>[] = []
   for (let daysAgo = 30; daysAgo >= 0; daysAgo--) {
     const count = Math.floor(next() * 3)
     for (let i = 0; i < count; i++) {
-      const category = pick(next, categories)
+      const category = pick(next, Object.keys(spending))
       const [description, base] = pick(next, spending[category]!)
       rows.push({
         date: addDays(today, -daysAgo),
         description,
         category,
+        type: 'Expense',
         amount: Math.round((base * (0.8 + next() * 0.4)) / 1000) * 1000,
       })
     }
   }
-  rows.push({ date: today, description: 'Gift', amount: 200_000 })
+  rows.push({ date: today, description: 'Gift', type: 'Expense', amount: 200_000 })
+  const thisMonth = `${today.slice(0, 7)}-01`
+  for (const date of [`${addDays(thisMonth, -1).slice(0, 7)}-01`, thisMonth]) {
+    rows.push({
+      date,
+      description: 'Salary',
+      category: 'Salary',
+      type: 'Income',
+      amount: 6_500_000,
+    })
+  }
+  rows.push({
+    date: addDays(today, -20),
+    description: 'Logo design',
+    category: 'Freelance',
+    type: 'Income',
+    amount: 1_500_000,
+  })
+  rows.sort((a, b) => String(a.date).localeCompare(String(b.date)))
   return {
     name: 'Expenses',
     processorId: 'totals',
@@ -144,6 +163,7 @@ function expenses(today: string): ExampleTemplate {
       { id: 'date', name: 'Date', type: 'date' },
       { id: 'description', name: 'Description', type: 'text' },
       { id: 'category', name: 'Category', type: 'select', options: categories },
+      { id: 'type', name: 'Type', type: 'select', options: ['Expense', 'Income'] },
       { id: 'amount', name: 'Amount', type: 'number' },
     ],
     rows,

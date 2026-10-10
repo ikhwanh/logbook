@@ -6,6 +6,7 @@ export interface Slot {
   key: string
   label: string
   type: ColumnType
+  optional?: boolean
 }
 
 export interface Processor<Result = unknown> {

@@ -20,5 +20,6 @@ describe('App', () => {
     const wrapper = mount(App, { global: { plugins: [router] } })
     expect(wrapper.text()).toContain('Logbook')
     expect(wrapper.text()).toContain('stored on this device')
+    expect(wrapper.find('a[href="#/settings"]').exists()).toBe(true)
   })
 })

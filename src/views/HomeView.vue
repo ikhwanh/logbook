@@ -4,9 +4,10 @@ import { useRouter } from 'vue-router'
 import { createLogbook, createLogbookFromTemplate, listLogbooks } from '@/db/logbooks'
 import { exportLogbooks, importLogbooks, ImportError, parseExport } from '@/db/transfer'
 import { downloadJson, exportFilename } from '@/logbook/download'
-import { processors, type Processor } from '@/processors'
+import type { Processor } from '@/processors'
 import { buildExamples } from '@/processors/examples'
 import { useLiveQuery } from '@/composables/useLiveQuery'
+import { visibleProcessors } from '@/settings'
 
 const router = useRouter()
 const logbooks = useLiveQuery(listLogbooks, [])
@@ -89,11 +90,11 @@ async function importFile(event: Event) {
       />
     </div>
 
-    <section class="examples">
+    <section v-if="visibleProcessors.length" class="examples">
       <h2>Start from an example</h2>
       <div class="cards">
         <button
-          v-for="processor in processors"
+          v-for="processor in visibleProcessors"
           :key="processor.id"
           type="button"
           class="card"

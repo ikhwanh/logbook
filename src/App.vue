@@ -8,6 +8,7 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
   <header>
     <h1><RouterLink :to="{ name: 'home' }">Logbook</RouterLink></h1>
     <OnlineStatus />
+    <RouterLink :to="{ name: 'settings' }" class="settings-link">Settings</RouterLink>
   </header>
   <!-- Keyed by path so live queries restart when switching between logbooks. -->
   <RouterView :key="$route.path" />
@@ -16,30 +17,24 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
 
 <style>
 :root {
-  --bg: #f4f1ea;
-  --surface: #fffdf8;
-  --text: #1d2320;
-  --muted: #6b726d;
-  --border: #ddd6c6;
-  --accent: #1f6f5c;
-  --accent-soft: #dcebe5;
-  --warn: #8a4b00;
-  --warn-soft: #f7e3c4;
+  --bg: light-dark(#f4f1ea, #161a18);
+  --surface: light-dark(#fffdf8, #1f2421);
+  --text: light-dark(#1d2320, #e8e6e0);
+  --muted: light-dark(#6b726d, #979f99);
+  --border: light-dark(#ddd6c6, #343b37);
+  --accent: light-dark(#1f6f5c, #7fc8b2);
+  --accent-soft: light-dark(#dcebe5, #1f3a32);
+  --warn: light-dark(#8a4b00, #f0b768);
+  --warn-soft: light-dark(#f7e3c4, #3d2c14);
   color-scheme: light dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #161a18;
-    --surface: #1f2421;
-    --text: #e8e6e0;
-    --muted: #979f99;
-    --border: #343b37;
-    --accent: #7fc8b2;
-    --accent-soft: #1f3a32;
-    --warn: #f0b768;
-    --warn-soft: #3d2c14;
-  }
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 body {
@@ -71,6 +66,21 @@ header h1 {
 header h1 a {
   color: var(--accent);
   text-decoration: none;
+}
+
+.settings-link {
+  margin-left: auto;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.settings-link:hover,
+.settings-link.router-link-active {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 button {

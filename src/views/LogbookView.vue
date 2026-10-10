@@ -6,8 +6,9 @@ import { deleteLogbook, listEntries, renameLogbook } from '@/db/logbooks'
 import { exportLogbooks } from '@/db/transfer'
 import { downloadJson, exportFilename } from '@/logbook/download'
 import { useLiveQuery } from '@/composables/useLiveQuery'
-import { findProcessor, processors } from '@/processors'
+import { findProcessor } from '@/processors'
 import { resolveBinding } from '@/processors/binding'
+import { visibleProcessors } from '@/settings'
 import LogbookTable from '@/components/logbook/LogbookTable.vue'
 import ProcessorPanel from '@/components/processors/ProcessorPanel.vue'
 
@@ -19,10 +20,17 @@ const router = useRouter()
 const logbook = useLiveQuery(async () => (await db.logbooks.get(props.id)) ?? null)
 const entries = useLiveQuery(() => listEntries(props.id), [])
 
-const activeProcessor = computed(() => findProcessor(route.query.view))
+// A hidden view falls back to the table so stale links still land somewhere useful.
+const activeProcessor = computed(() => {
+  const processor = findProcessor(route.query.view)
+  return processor && visibleProcessors.value.includes(processor) ? processor : undefined
+})
 const supported = computed(() =>
   Object.fromEntries(
-    processors.map((p) => [p.id, logbook.value ? resolveBinding(p, logbook.value).ok : false]),
+    visibleProcessors.value.map((p) => [
+      p.id,
+      logbook.value ? resolveBinding(p, logbook.value).ok : false,
+    ]),
   ),
 )
 
@@ -68,7 +76,7 @@ async function remove() {
         Table
       </RouterLink>
       <RouterLink
-        v-for="processor in processors"
+        v-for="processor in visibleProcessors"
         :key="processor.id"
         :to="{ query: { view: processor.id } }"
         :class="{ active: activeProcessor === processor, unsupported: !supported[processor.id] }"

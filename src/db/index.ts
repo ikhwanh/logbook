@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
+import type { ProcessorId } from '@/processors/types'
 
 export interface Setting {
   key: string
@@ -18,6 +19,8 @@ export interface Logbook {
   id: string
   name: string
   columns: Column[]
+  // Which column each processor slot uses, when the user picked one.
+  processors?: Partial<Record<ProcessorId, Record<string, string>>>
   createdAt: number
   updatedAt: number
 }

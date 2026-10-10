@@ -1,17 +1,25 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { createLogbook, listLogbooks } from '@/db/logbooks'
+import { createLogbook, createLogbookFromTemplate, listLogbooks } from '@/db/logbooks'
+import { processors, type Processor } from '@/processors'
+import { buildExamples } from '@/processors/examples'
 import { useLiveQuery } from '@/composables/useLiveQuery'
 
 const router = useRouter()
 const logbooks = useLiveQuery(listLogbooks, [])
 const name = ref('')
+const examples = buildExamples()
 
 const updatedFormat = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',
   timeStyle: 'short',
 })
+
+async function createExample(processor: Processor) {
+  const id = await createLogbookFromTemplate(examples[processor.id])
+  router.push({ name: 'logbook', params: { id }, query: { view: processor.id } })
+}
 
 async function create() {
   const id = await createLogbook(name.value.trim() || 'Untitled logbook')
@@ -44,6 +52,22 @@ async function create() {
       </li>
     </ul>
     <p v-else class="empty">No logbooks yet. Create one to start logging.</p>
+
+    <section class="examples">
+      <h2>Start from an example</h2>
+      <div class="cards">
+        <button
+          v-for="processor in processors"
+          :key="processor.id"
+          type="button"
+          class="card"
+          @click="createExample(processor)"
+        >
+          <span class="name">{{ examples[processor.id].name }}</span>
+          <span class="meta">{{ processor.name }} · {{ processor.description }}</span>
+        </button>
+      </div>
+    </section>
 
     <p class="note">All data is stored on this device. Nothing is sent to a server.</p>
   </main>
@@ -116,6 +140,36 @@ async function create() {
 .note {
   color: var(--muted);
   font-size: 0.875rem;
+}
+
+.examples {
+  margin-top: 2rem;
+}
+
+.examples h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.75rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.875rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  text-align: left;
+}
+
+.card:hover {
+  background: var(--accent-soft);
 }
 
 .note {

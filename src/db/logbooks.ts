@@ -1,4 +1,5 @@
 import Dexie from 'dexie'
+import type { ExampleTemplate, ProcessorId } from '@/processors/types'
 import { db, type CellValue, type Column, type Entry, type Logbook } from './index'
 
 export function listLogbooks() {
@@ -25,6 +26,31 @@ export async function createLogbook(name: string): Promise<string> {
     updatedAt: now,
   }
   await db.logbooks.add(logbook)
+  return logbook.id
+}
+
+export async function createLogbookFromTemplate(template: ExampleTemplate): Promise<string> {
+  const now = Date.now()
+  const ids = new Map(template.columns.map((column) => [column.id, crypto.randomUUID()]))
+  const logbook: Logbook = {
+    id: crypto.randomUUID(),
+    name: template.name,
+    columns: template.columns.map((column) => ({ ...column, id: ids.get(column.id)! })),
+    createdAt: now,
+    updatedAt: now,
+  }
+  // Each row is a millisecond apart so they keep their template order.
+  const entries: Entry[] = template.rows.map((row, i) => ({
+    id: crypto.randomUUID(),
+    logbookId: logbook.id,
+    values: Object.fromEntries(Object.entries(row).map(([key, value]) => [ids.get(key)!, value])),
+    createdAt: now + i,
+    updatedAt: now,
+  }))
+  await db.transaction('rw', db.logbooks, db.entries, async () => {
+    await db.logbooks.add(logbook)
+    await db.entries.bulkAdd(entries)
+  })
   return logbook.id
 }
 
@@ -56,6 +82,21 @@ export function saveColumn(logbookId: string, column: Column) {
 
 // Entry values for the column are left in place so the data survives if the
 // column is recreated or the deletion is undone later.
+export function saveBinding(
+  logbookId: string,
+  processorId: ProcessorId,
+  slotKey: string,
+  columnId: string,
+) {
+  return db.logbooks
+    .where('id')
+    .equals(logbookId)
+    .modify((logbook) => {
+      logbook.processors ??= {}
+      logbook.processors[processorId] = { ...logbook.processors[processorId], [slotKey]: columnId }
+    })
+}
+
 export function deleteColumn(logbookId: string, columnId: string) {
   return db.logbooks
     .where('id')

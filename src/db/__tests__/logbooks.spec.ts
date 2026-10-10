@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { db } from '../index'
+import { buildExamples } from '@/processors/examples'
 import {
   addEntry,
   createLogbook,
+  createLogbookFromTemplate,
   deleteColumn,
   deleteLogbook,
   listEntries,
+  saveBinding,
   saveColumn,
   updateCell,
 } from '../logbooks'
@@ -76,5 +79,25 @@ describe('logbooks', () => {
     expect(await db.logbooks.get(a)).toBeUndefined()
     expect(await listEntries(a)).toEqual([])
     expect(await listEntries(b)).toHaveLength(1)
+  })
+
+  it('creates a logbook from a template with fresh column ids', async () => {
+    const template = buildExamples('2026-10-10').chart
+    const id = await createLogbookFromTemplate(template)
+    const logbook = (await db.logbooks.get(id))!
+    const entries = await listEntries(id)
+
+    expect(logbook.columns.map((c) => c.name)).toEqual(template.columns.map((c) => c.name))
+    expect(logbook.columns.map((c) => c.id)).not.toContain('date')
+    expect(entries).toHaveLength(template.rows.length)
+    const dateColumn = logbook.columns.find((c) => c.name === 'Date')!
+    expect(entries[0]!.values[dateColumn.id]).toBe(template.rows[0]!.date)
+  })
+
+  it('saves a processor binding per slot', async () => {
+    const id = await createLogbook('Fuel')
+    await saveBinding(id, 'chart', 'value', 'a')
+    await saveBinding(id, 'chart', 'date', 'b')
+    expect((await db.logbooks.get(id))?.processors).toEqual({ chart: { value: 'a', date: 'b' } })
   })
 })

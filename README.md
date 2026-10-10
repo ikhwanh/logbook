@@ -5,7 +5,7 @@ Offline-first logbook built with Vue 3 and Vite. It is a fully client-side PWA w
 ## How it works
 
 - **Storage**: [Dexie](https://dexie.org) over IndexedDB, in `src/db/index.ts`. To change the schema, add a new `version(n)` block and never edit one that has shipped. `useLiveQuery` (`src/composables/useLiveQuery.ts`) gives you reactive queries.
-- **Durability**: on startup the app calls `navigator.storage.persist()` so the browser is less likely to evict data. Browsers grant this by their own heuristics (installed PWA, bookmarked, frequent use), so it may be denied. There is no server copy, so clearing site data deletes everything.
+- **Durability**: on startup the app calls `navigator.storage.persist()` so the browser is less likely to evict data. Browsers grant this by their own heuristics (installed PWA, bookmarked, frequent use), so it may be denied. There is no server copy, so clearing site data deletes everything. Export (one logbook from its page, or all from the home page) downloads a JSON backup; Import adds the logbooks in such a file as new copies (`src/db/transfer.ts`).
 - **Offline**: `vite-plugin-pwa` generates a Workbox service worker that precaches the whole build. After the first visit, the app loads with no network.
 - **Install**: the manifest and icons are generated from `public/logo.svg` at build time.
 - **Updates**: when a new build is deployed, `ReloadPrompt.vue` asks before reloading (`registerType: 'prompt'`).

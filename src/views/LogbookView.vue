@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { db } from '@/db'
 import { deleteLogbook, listEntries, renameLogbook } from '@/db/logbooks'
+import { exportLogbooks } from '@/db/transfer'
+import { downloadJson, exportFilename } from '@/logbook/download'
 import { useLiveQuery } from '@/composables/useLiveQuery'
 import { findProcessor, processors } from '@/processors'
 import { resolveBinding } from '@/processors/binding'
@@ -29,6 +31,11 @@ function rename(event: Event) {
   if (name) renameLogbook(props.id, name)
 }
 
+async function exportFile() {
+  if (!logbook.value) return
+  downloadJson(exportFilename(logbook.value.name), await exportLogbooks([props.id]))
+}
+
 async function remove() {
   if (!logbook.value || !confirm(`Delete "${logbook.value.name}" and all its rows?`)) return
   await deleteLogbook(props.id)
@@ -49,6 +56,7 @@ async function remove() {
         @keydown.enter="($event.target as HTMLInputElement).blur()"
       />
       <span class="count">{{ entries.length }} {{ entries.length === 1 ? 'row' : 'rows' }}</span>
+      <button @click="exportFile">Export</button>
       <button class="danger" @click="remove">Delete</button>
     </div>
     <nav class="tabs" aria-label="Views">

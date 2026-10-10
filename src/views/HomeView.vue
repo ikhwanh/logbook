@@ -2,6 +2,8 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { createLogbook, createLogbookFromTemplate, listLogbooks } from '@/db/logbooks'
+import { exportLogbooks, importLogbooks, ImportError, parseExport } from '@/db/transfer'
+import { downloadJson, exportFilename } from '@/logbook/download'
 import { processors, type Processor } from '@/processors'
 import { buildExamples } from '@/processors/examples'
 import { useLiveQuery } from '@/composables/useLiveQuery'
@@ -10,6 +12,7 @@ const router = useRouter()
 const logbooks = useLiveQuery(listLogbooks, [])
 const name = ref('')
 const examples = buildExamples()
+const fileInput = ref<HTMLInputElement>()
 
 const updatedFormat = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',
@@ -25,6 +28,27 @@ async function create() {
   const id = await createLogbook(name.value.trim() || 'Untitled logbook')
   name.value = ''
   router.push({ name: 'logbook', params: { id } })
+}
+
+async function exportAll() {
+  downloadJson(exportFilename('logbooks'), await exportLogbooks())
+}
+
+async function importFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  // Cleared so picking the same file again still fires change.
+  input.value = ''
+  if (!file) return
+  let ids: string[]
+  try {
+    ids = await importLogbooks(parseExport(await file.text()))
+  } catch (error) {
+    const reason = error instanceof ImportError ? ` ${error.message}` : ''
+    alert(`Couldn't import "${file.name}".${reason}`)
+    return
+  }
+  if (ids.length === 1) router.push({ name: 'logbook', params: { id: ids[0] } })
 }
 </script>
 
@@ -53,6 +77,18 @@ async function create() {
     </ul>
     <p v-else class="empty">No logbooks yet. Create one to start logging.</p>
 
+    <div class="transfer">
+      <button type="button" @click="fileInput?.click()">Import</button>
+      <button v-if="logbooks.length" type="button" @click="exportAll">Export all</button>
+      <input
+        ref="fileInput"
+        type="file"
+        accept=".json,application/json"
+        hidden
+        @change="importFile"
+      />
+    </div>
+
     <section class="examples">
       <h2>Start from an example</h2>
       <div class="cards">
@@ -69,7 +105,10 @@ async function create() {
       </div>
     </section>
 
-    <p class="note">All data is stored on this device. Nothing is sent to a server.</p>
+    <p class="note">
+      All data is stored on this device. Nothing is sent to a server. Export your logbooks to keep a
+      backup.
+    </p>
   </main>
 </template>
 
@@ -140,6 +179,12 @@ async function create() {
 .note {
   color: var(--muted);
   font-size: 0.875rem;
+}
+
+.transfer {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
 }
 
 .examples {

@@ -71,6 +71,34 @@ function packingList(): ExampleTemplate {
   }
 }
 
+function projects(today: string): ExampleTemplate {
+  // [name, start, due] in days from today, so the example always has a mix of
+  // ended, active and upcoming rows.
+  const items: [string, number, number][] = [
+    ['Passport renewal', -60, -21],
+    ['Kitchen renovation', -45, -4],
+    ['Spanish course', -30, 60],
+    ['Tax return', -12, 5],
+    ['Website redesign', -3, 25],
+    ['Garden shed', 4, 18],
+    ['Marathon training', 10, 120],
+  ]
+  return {
+    name: 'Projects',
+    processorId: 'timeline',
+    columns: [
+      { id: 'project', name: 'Project', type: 'text' },
+      { id: 'start', name: 'Start', type: 'date' },
+      { id: 'due', name: 'Due', type: 'date' },
+    ],
+    rows: items.map(([project, start, due]) => ({
+      project,
+      start: addDays(today, start),
+      due: addDays(today, due),
+    })),
+  }
+}
+
 function expenses(today: string): ExampleTemplate {
   const next = random(2)
   const spending: Record<string, [string, number][]> = {
@@ -151,6 +179,7 @@ export function buildExamples(today = localToday()): Record<ProcessorId, Example
   return {
     chart: fuelLog(today),
     checklist: packingList(),
+    timeline: projects(today),
     totals: expenses(today),
     streaks: habitTracker(today),
   }

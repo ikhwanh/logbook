@@ -6,6 +6,7 @@ import { checklist } from '../checklist'
 import { buildExamples } from '../examples'
 import { processors } from '../index'
 import { runStreaks } from '../streaks'
+import { runTimeline, timeline } from '../timeline'
 import { totals } from '../totals'
 
 const col = (id: string, type: Column['type']): Column => ({ id, name: id, type })
@@ -44,6 +45,19 @@ describe('resolveBinding', () => {
     const retyped = [col('d', 'date'), col('liters', 'number'), col('cost', 'text')]
     const changed = resolveBinding(chart, logbook(retyped, { chart: { value: 'cost' } }))
     expect(changed.ok && changed.columns.value!.id).toBe('liters')
+  })
+
+  it('fills same-typed slots in order, and a saved choice can swap them', () => {
+    const plan = [col('name', 'text'), col('from', 'date'), col('to', 'date')]
+    const auto = resolveBinding(timeline, logbook(plan))
+    expect(auto.ok && [auto.columns.start!.id, auto.columns.end!.id]).toEqual(['from', 'to'])
+
+    const saved = { timeline: { start: 'to', end: 'from' } }
+    const swapped = resolveBinding(timeline, logbook(plan, saved))
+    expect(swapped.ok && [swapped.columns.start!.id, swapped.columns.end!.id]).toEqual([
+      'to',
+      'from',
+    ])
   })
 
   it('reports missing slots', () => {
@@ -87,6 +101,40 @@ describe('checklist', () => {
       ['Charger', false],
     ])
     expect(result).toMatchObject({ done: 1, total: 2 })
+  })
+})
+
+describe('timeline', () => {
+  const columns = { item: col('i', 'text'), start: col('s', 'date'), end: col('e', 'date') }
+  // 2026-10-10 is today in every case.
+  const run = (rows: Record<string, CellValue>[]) =>
+    runTimeline(entries(rows), columns, '2026-10-10')
+
+  it('counts elapsed days inclusively and clamps before the start and after the end', () => {
+    const result = run([
+      { i: 'Active', s: '2026-10-01', e: '2026-10-31' },
+      { i: 'Upcoming', s: '2026-10-13', e: '2026-10-20' },
+      { i: 'Ended', s: '2026-09-01', e: '2026-09-30' },
+      { i: 'Today only', s: '2026-10-10', e: '2026-10-10' },
+    ])
+    const byLabel = Object.fromEntries(result.items.map((item) => [item.label, item]))
+    expect(byLabel.Active).toMatchObject({ status: 'active', fraction: 10 / 31, endsIn: 21 })
+    expect(byLabel.Upcoming).toMatchObject({ status: 'upcoming', fraction: 0, startsIn: 3 })
+    expect(byLabel.Ended).toMatchObject({ status: 'ended', fraction: 1, endsIn: -10 })
+    expect(byLabel['Today only']).toMatchObject({ status: 'active', fraction: 1, endsIn: 0 })
+    expect(result).toMatchObject({ active: 2, upcoming: 1, ended: 1 })
+  })
+
+  it('sorts by start date and skips rows without a label or a valid range', () => {
+    const result = run([
+      { i: 'Second', s: '2026-10-05', e: '2026-10-20' },
+      { i: 'First', s: '2026-10-01', e: '2026-10-20' },
+      { i: ' ', s: '2026-10-01', e: '2026-10-02' },
+      { i: 'No end', s: '2026-10-01' },
+      { i: 'Backwards', s: '2026-10-20', e: '2026-10-01' },
+      { i: 'Not a date', s: 'soon', e: '2026-10-20' },
+    ])
+    expect(result.items.map((item) => item.label)).toEqual(['First', 'Second'])
   })
 })
 

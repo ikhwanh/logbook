@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
-import type { Entry, Logbook } from '@/db'
+import type { ColumnType, Entry, Logbook } from '@/db'
 import { saveBinding } from '@/db/logbooks'
 import { columnTypes } from '@/logbook/columnTypes'
 import { candidates, resolveBinding } from '@/processors/binding'
@@ -8,6 +8,7 @@ import type { Processor, ProcessorId, Slot } from '@/processors'
 import ChecklistView from './ChecklistView.vue'
 import LineChart from './LineChart.vue'
 import StreaksView from './StreaksView.vue'
+import TimelineView from './TimelineView.vue'
 import TotalsView from './TotalsView.vue'
 
 const props = defineProps<{ processor: Processor; logbook: Logbook; entries: Entry[] }>()
@@ -15,6 +16,7 @@ const props = defineProps<{ processor: Processor; logbook: Logbook; entries: Ent
 const views: Record<ProcessorId, Component> = {
   chart: LineChart,
   checklist: ChecklistView,
+  timeline: TimelineView,
   totals: TotalsView,
   streaks: StreaksView,
 }
@@ -24,18 +26,42 @@ const result = computed(() =>
   binding.value.ok ? props.processor.run(props.entries, binding.value.columns) : undefined,
 )
 
-const typeLabel = (slot: Slot) => columnTypes[slot.type].label
-const needs = computed(() =>
-  props.processor.slots.map((slot) => `a ${typeLabel(slot)} column`).join(' and '),
-)
+function list(word: 'and' | 'or', items: string[]) {
+  return items.length < 2
+    ? items.join('')
+    : `${items.slice(0, -1).join(', ')} ${word} ${items[items.length - 1]}`
+}
+
+const typeLabel = (type: ColumnType) => columnTypes[type].label
+
+const needs = computed(() => {
+  const counts = new Map<ColumnType, number>()
+  for (const slot of props.processor.slots) counts.set(slot.type, (counts.get(slot.type) ?? 0) + 1)
+  const parts = [...counts].map(([type, count]) =>
+    count === 1 ? `a ${typeLabel(type)} column` : `${count} ${typeLabel(type)} columns`,
+  )
+  return list('and', parts)
+})
 const slotColumns = computed(() => {
   const result = binding.value
   if (!result.ok) return ''
-  return props.processor.slots.map((slot) => result.columns[slot.key]!.name).join(' and ')
+  return list(
+    'and',
+    props.processor.slots.map((slot) => result.columns[slot.key]!.name),
+  )
 })
-const missing = computed(() =>
-  binding.value.ok ? [] : [...new Set(binding.value.missing.map(typeLabel))],
-)
+// When a processor needs two columns of a type and the logbook has one, saying
+// it has "no" column of that type would be wrong.
+const shortfall = computed(() => {
+  if (binding.value.ok) return ''
+  const types = [...new Set(binding.value.missing.map((slot) => slot.type))]
+  const present = types.filter((type) => props.logbook.columns.some((c) => c.type === type))
+  const absent = types.filter((type) => !present.includes(type))
+  const parts = []
+  if (absent.length) parts.push(`has no ${list('or', absent.map(typeLabel))} column`)
+  if (present.length) parts.push(`needs another ${list('or', present.map(typeLabel))} column`)
+  return list('and', parts)
+})
 
 function choose(slot: Slot, event: Event) {
   const columnId = (event.target as HTMLSelectElement).value
@@ -68,8 +94,8 @@ function choose(slot: Slot, event: Event) {
         <strong>{{ processor.name }}</strong> needs {{ needs }}.
       </p>
       <p>
-        This logbook has no {{ missing.join(' or ') }} column. Add one from the
-        <strong>+</strong> at the end of the table header.
+        This logbook {{ shortfall }}. Add one from the <strong>+</strong> at the end of the table
+        header.
       </p>
       <RouterLink :to="{ query: {} }">Go to table</RouterLink>
     </div>

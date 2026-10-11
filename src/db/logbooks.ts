@@ -132,6 +132,6 @@ export function updateCell(entry: Entry, columnId: string, value: CellValue | un
   })
 }
 
-export function deleteEntry(id: string) {
-  return db.entries.delete(id)
+export function deleteEntries(ids: string[]) {
+  return db.entries.bulkDelete(ids)
 }

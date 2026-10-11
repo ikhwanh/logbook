@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import type { Entry, Logbook } from '@/db'
-import { addEntry, deleteColumn, deleteEntry, saveColumn, updateCell } from '@/db/logbooks'
+import { addEntry, deleteColumn, deleteEntries, saveColumn, updateCell } from '@/db/logbooks'
 import { columnTypes } from '@/logbook/columnTypes'
 import CellInput from './CellInput.vue'
 import ColumnDialog from './ColumnDialog.vue'
@@ -38,9 +38,43 @@ async function addRow(columnId = props.logbook.columns[0]?.id) {
   if (focusCell(entryId, columnId)) pendingFocus.value = undefined
 }
 
-function removeRow(entry: Entry) {
-  if (Object.keys(entry.values).length > 0 && !confirm('Delete this row?')) return
-  deleteEntry(entry.id)
+const selectedIds = ref(new Set<string>())
+// Filtering through entries drops ids of rows that were deleted elsewhere.
+const selectedEntries = computed(() => props.entries.filter((e) => selectedIds.value.has(e.id)))
+const allSelected = computed(
+  () => props.entries.length > 0 && selectedEntries.value.length === props.entries.length,
+)
+let anchorId: string | undefined
+
+function toggleRow(event: MouseEvent, entry: Entry) {
+  const checked = (event.target as HTMLInputElement).checked
+  const index = props.entries.indexOf(entry)
+  const anchor = props.entries.findIndex((e) => e.id === anchorId)
+  const range =
+    event.shiftKey && anchor !== -1
+      ? props.entries.slice(Math.min(anchor, index), Math.max(anchor, index) + 1)
+      : [entry]
+  for (const { id } of range) {
+    if (checked) selectedIds.value.add(id)
+    else selectedIds.value.delete(id)
+  }
+  anchorId = entry.id
+}
+
+function toggleAll(event: Event) {
+  if ((event.target as HTMLInputElement).checked) {
+    selectedIds.value = new Set(props.entries.map((e) => e.id))
+  } else {
+    selectedIds.value.clear()
+  }
+}
+
+async function removeSelected() {
+  const rows = selectedEntries.value
+  const label = rows.length === 1 ? 'this row' : `${rows.length} rows`
+  if (rows.some((e) => Object.keys(e.values).length > 0) && !confirm(`Delete ${label}?`)) return
+  await deleteEntries(rows.map((e) => e.id))
+  selectedIds.value.clear()
 }
 
 function onCellKeydown(event: KeyboardEvent, rowIndex: number, columnId: string) {
@@ -64,10 +98,21 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', flushOnHi
 
 <template>
   <div ref="scroller" class="scroller">
-    <table>
+    <table :class="{ selecting: selectedEntries.length > 0 }">
       <thead>
         <tr>
-          <th class="gutter" scope="col"><span class="visually-hidden">Row</span></th>
+          <th class="gutter" scope="col">
+            <label class="select-box">
+              <input
+                type="checkbox"
+                aria-label="Select all rows"
+                :checked="allSelected"
+                :indeterminate="selectedEntries.length > 0 && !allSelected"
+                :disabled="entries.length === 0"
+                @change="toggleAll"
+              />
+            </label>
+          </th>
           <th
             v-for="column in logbook.columns"
             :key="column.id"
@@ -95,20 +140,23 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', flushOnHi
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(entry, rowIndex) in entries" :key="entry.id">
+        <tr
+          v-for="(entry, rowIndex) in entries"
+          :key="entry.id"
+          :class="{ selected: selectedIds.has(entry.id) }"
+        >
           <th class="gutter" scope="row">
             <span class="row-number">{{ rowIndex + 1 }}</span>
-            <!-- mousedown.prevent keeps focus in the row; otherwise the button hides
+            <!-- mousedown.prevent keeps focus in the row; otherwise the checkbox hides
                  itself (it only shows on focus-within) before the tap's click lands. -->
-            <button
-              class="delete-row"
-              aria-label="Delete row"
-              title="Delete row"
-              @mousedown.prevent
-              @click="removeRow(entry)"
-            >
-              ×
-            </button>
+            <label class="select-box select-row" @mousedown.prevent>
+              <input
+                type="checkbox"
+                :aria-label="`Select row ${rowIndex + 1}`"
+                :checked="selectedIds.has(entry.id)"
+                @click="toggleRow($event, entry)"
+              />
+            </label>
           </th>
           <td v-for="column in logbook.columns" :key="column.id">
             <CellInput
@@ -125,6 +173,12 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', flushOnHi
       </tbody>
     </table>
     <button class="add-row" @click="addRow()">+ New row</button>
+  </div>
+
+  <div v-if="selectedEntries.length > 0" class="selection-bar">
+    <span class="selection-count">{{ selectedEntries.length }} selected</span>
+    <button @click="selectedIds.clear()">Clear</button>
+    <button class="danger" @click="removeSelected">Delete</button>
   </div>
 
   <ColumnDialog
@@ -244,31 +298,61 @@ tbody .filler {
   color: var(--accent);
 }
 
-.delete-row {
-  display: none;
-  width: 100%;
+.select-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-height: 2.5rem;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--warn);
-  font-size: 1.125rem;
+  cursor: pointer;
 }
 
-tr:hover .delete-row,
-tr:focus-within .delete-row {
-  display: block;
+.select-box input {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: inherit;
+}
+
+.select-row {
+  display: none;
+}
+
+tr:hover .select-row,
+tr:focus-within .select-row,
+.selecting .select-row {
+  display: flex;
 }
 
 tr:hover .row-number,
-tr:focus-within .row-number {
+tr:focus-within .row-number,
+.selecting .row-number {
   display: none;
 }
 
-tbody tr:focus-within .gutter {
+tbody tr:focus-within .gutter,
+tbody tr.selected .gutter {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+tbody tr.selected td:not(.filler) {
+  background: color-mix(in srgb, var(--accent-soft) 50%, var(--surface));
+}
+
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.selection-count {
+  flex: 1;
+  color: var(--muted);
+  font-size: 0.875rem;
 }
 
 .add-row {
@@ -282,14 +366,5 @@ tbody tr:focus-within .gutter {
 
 .add-row:hover {
   background: var(--accent-soft);
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 </style>

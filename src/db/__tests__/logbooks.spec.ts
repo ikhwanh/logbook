@@ -6,6 +6,7 @@ import {
   createLogbook,
   createLogbookFromTemplate,
   deleteColumn,
+  deleteEntries,
   deleteLogbook,
   listEntries,
   saveBinding,
@@ -79,6 +80,15 @@ describe('logbooks', () => {
     expect(await db.logbooks.get(a)).toBeUndefined()
     expect(await listEntries(a)).toEqual([])
     expect(await listEntries(b)).toHaveLength(1)
+  })
+
+  it('deletes only the given entries', async () => {
+    const logbookId = await createLogbook('Fuel')
+    const a = await addEntry(logbookId)
+    const b = await addEntry(logbookId)
+    const c = await addEntry(logbookId)
+    await deleteEntries([a, c])
+    expect((await listEntries(logbookId)).map((e) => e.id)).toEqual([b])
   })
 
   it('creates a logbook from a template with fresh column ids', async () => {

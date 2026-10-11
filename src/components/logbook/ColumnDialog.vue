@@ -1,12 +1,19 @@
 <script setup lang="ts">
-import { ref, useTemplateRef } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import type { Column, ColumnType } from '@/db'
 import { columnTypeIds, columnTypes } from '@/logbook/columnTypes'
 
-const emit = defineEmits<{ save: [column: Column]; delete: [columnId: string] }>()
+const props = defineProps<{ columns: Column[] }>()
+
+const emit = defineEmits<{
+  save: [column: Column]
+  delete: [columnId: string]
+  move: [columnId: string, offset: -1 | 1]
+}>()
 
 const dialog = useTemplateRef('dialog')
 const editing = ref<Column>()
+const index = computed(() => props.columns.findIndex((c) => c.id === editing.value?.id))
 const name = ref('')
 const type = ref<ColumnType>('text')
 const optionsText = ref('')
@@ -77,6 +84,22 @@ defineExpose({ open })
         <textarea v-model="optionsText" rows="5"></textarea>
       </label>
 
+      <div v-if="editing" class="field">
+        Position
+        <div class="move">
+          <button type="button" :disabled="index <= 0" @click="emit('move', editing.id, -1)">
+            ← Move left
+          </button>
+          <button
+            type="button"
+            :disabled="index >= columns.length - 1"
+            @click="emit('move', editing.id, 1)"
+          >
+            Move right →
+          </button>
+        </div>
+      </div>
+
       <p v-if="editing && editing.type !== type" class="hint">
         Existing values that don't fit the new type are kept and highlighted until you overwrite
         them.
@@ -119,7 +142,8 @@ h2 {
   font-size: 1.125rem;
 }
 
-label {
+label,
+.field {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
@@ -160,9 +184,15 @@ textarea {
   font-weight: normal;
 }
 
-.actions {
+.actions,
+.move {
   display: flex;
   gap: 0.5rem;
+}
+
+.move button {
+  flex: 1;
+  font-weight: normal;
 }
 
 .spacer {

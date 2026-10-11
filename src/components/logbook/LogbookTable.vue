@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import type { Entry, Logbook } from '@/db'
-import { addEntry, deleteColumn, deleteEntries, saveColumn, updateCell } from '@/db/logbooks'
+import {
+  addEntry,
+  deleteColumn,
+  deleteEntries,
+  moveColumn,
+  saveColumn,
+  updateCell,
+} from '@/db/logbooks'
 import { columnTypes } from '@/logbook/columnTypes'
 import CellInput from './CellInput.vue'
 import ColumnDialog from './ColumnDialog.vue'
@@ -183,8 +190,10 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', flushOnHi
 
   <ColumnDialog
     ref="columnDialog"
+    :columns="logbook.columns"
     @save="(column) => saveColumn(logbook.id, column)"
     @delete="(columnId) => deleteColumn(logbook.id, columnId)"
+    @move="(columnId, offset) => moveColumn(logbook.id, columnId, offset)"
   />
 </template>
 

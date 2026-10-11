@@ -9,6 +9,7 @@ import {
   deleteEntries,
   deleteLogbook,
   listEntries,
+  moveColumn,
   saveBinding,
   saveColumn,
   updateCell,
@@ -69,6 +70,23 @@ describe('logbooks', () => {
     columns = (await db.logbooks.get(logbookId))!.columns
     expect(columns).toHaveLength(2)
     expect((await db.entries.get(entryId))?.values).toEqual({ liters: 40 })
+  })
+
+  it('moves columns left and right, staying within bounds', async () => {
+    const logbookId = await createLogbook('Fuel')
+    await saveColumn(logbookId, { id: 'liters', name: 'Liters', type: 'number' })
+    const names = async () => (await db.logbooks.get(logbookId))!.columns.map((c) => c.name)
+
+    await moveColumn(logbookId, 'liters', -1)
+    expect(await names()).toEqual(['Date', 'Liters', 'Note'])
+
+    await moveColumn(logbookId, 'liters', 1)
+    expect(await names()).toEqual(['Date', 'Note', 'Liters'])
+
+    await moveColumn(logbookId, 'liters', 1)
+    const [first] = (await db.logbooks.get(logbookId))!.columns
+    await moveColumn(logbookId, first!.id, -1)
+    expect(await names()).toEqual(['Date', 'Note', 'Liters'])
   })
 
   it('deletes a logbook with its entries only', async () => {

@@ -80,6 +80,20 @@ export function saveColumn(logbookId: string, column: Column) {
     })
 }
 
+export function moveColumn(logbookId: string, columnId: string, offset: -1 | 1) {
+  return db.logbooks
+    .where('id')
+    .equals(logbookId)
+    .modify((logbook) => {
+      const from = logbook.columns.findIndex((c) => c.id === columnId)
+      const to = from + offset
+      if (from === -1 || to < 0 || to >= logbook.columns.length) return
+      const [column] = logbook.columns.splice(from, 1)
+      logbook.columns.splice(to, 0, column!)
+      logbook.updatedAt = Date.now()
+    })
+}
+
 // Entry values for the column are left in place so the data survives if the
 // column is recreated or the deletion is undone later.
 export function saveBinding(

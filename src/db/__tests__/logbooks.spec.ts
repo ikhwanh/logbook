@@ -127,5 +127,8 @@ describe('logbooks', () => {
     await saveBinding(id, 'chart', 'value', 'a')
     await saveBinding(id, 'chart', 'date', 'b')
     expect((await db.logbooks.get(id))?.processors).toEqual({ chart: { value: 'a', date: 'b' } })
+
+    await saveBinding(id, 'timeline', 'marks', ['c', 'd'])
+    expect((await db.logbooks.get(id))?.processors?.timeline).toEqual({ marks: ['c', 'd'] })
   })
 })

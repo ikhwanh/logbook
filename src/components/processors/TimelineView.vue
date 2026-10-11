@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Column } from '@/db'
-import type { TimelineItem, TimelineResult } from '@/processors/timeline'
+import type { TimelineItem, TimelineMark, TimelineResult } from '@/processors/timeline'
 import { formatShortDate } from './format'
 import StatTile from './StatTile.vue'
 
 const props = defineProps<{ result: TimelineResult; columns: Record<string, Column> }>()
 
-const endName = computed(() => props.columns.end!.name.toLowerCase())
+// A number column holds a length in days, so its name ("Days") can't stand in for the end.
+const endName = computed(() =>
+  props.columns.end!.type === 'date' ? props.columns.end!.name.toLowerCase() : 'end',
+)
 const next = computed(() =>
   props.result.items
     .filter((item) => item.status === 'active')
@@ -33,6 +36,16 @@ function range(item: TimelineItem) {
 }
 
 const percent = (item: TimelineItem) => Math.round(item.fraction * 100)
+
+function markLabel(mark: TimelineMark) {
+  const value = typeof mark.value === 'string' ? formatShortDate(mark.value) : `day ${mark.value}`
+  return `${mark.column.name}: ${value}`
+}
+
+function trackLabel(item: TimelineItem) {
+  const marks = item.marks.map(markLabel)
+  return [`${item.label}: ${percent(item)}% of time elapsed`, ...marks].join(', ')
+}
 </script>
 
 <template>
@@ -66,9 +79,16 @@ const percent = (item: TimelineItem) => Math.round(item.fraction * 100)
             :aria-valuenow="percent(item)"
             aria-valuemin="0"
             aria-valuemax="100"
-            :aria-label="`${item.label}: ${percent(item)}% of time elapsed`"
+            :aria-label="trackLabel(item)"
           >
             <div class="fill" :style="{ width: `${item.fraction * 100}%` }"></div>
+            <div
+              v-for="mark in item.marks"
+              :key="mark.column.id"
+              class="tick"
+              :style="{ left: `${mark.at * 100}%` }"
+              :title="markLabel(mark)"
+            ></div>
           </div>
           <div class="status">{{ status(item) }}</div>
           <div class="range">{{ range(item) }}</div>
@@ -142,9 +162,9 @@ li {
 }
 
 .track {
+  position: relative;
   grid-area: track;
   height: 0.5rem;
-  overflow: hidden;
   border-radius: 999px;
   background: var(--accent-soft);
 }
@@ -153,6 +173,23 @@ li {
   height: 100%;
   border-radius: 999px;
   background: var(--accent);
+}
+
+.tick {
+  position: absolute;
+  top: -0.25rem;
+  bottom: -0.25rem;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--text);
+  transform: translateX(-50%);
+}
+
+/* Widens the hover target so the title shows without pixel-hunting a 2px line. */
+.tick::before {
+  content: '';
+  position: absolute;
+  inset: 0 -0.25rem;
 }
 
 .status {

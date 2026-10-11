@@ -100,7 +100,7 @@ export function saveBinding(
   logbookId: string,
   processorId: ProcessorId,
   slotKey: string,
-  columnId: string,
+  columnId: string | string[],
 ) {
   return db.logbooks
     .where('id')

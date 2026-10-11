@@ -18,6 +18,7 @@ describe('transfer', () => {
     const id = await createLogbookFromTemplate(buildExamples('2026-10-10').chart)
     const original = (await db.logbooks.get(id))!
     await saveBinding(id, 'chart', 'value', original.columns[1]!.id)
+    await saveBinding(id, 'timeline', 'marks', [original.columns[0]!.id])
 
     const [copyId] = await roundTrip([id])
     const copy = (await db.logbooks.get(copyId!))!
@@ -27,7 +28,10 @@ describe('transfer', () => {
     expect(copyId).not.toBe(id)
     expect(copy.name).toBe(original.name)
     expect(copy.columns).toEqual(original.columns)
-    expect(copy.processors).toEqual({ chart: { value: original.columns[1]!.id } })
+    expect(copy.processors).toEqual({
+      chart: { value: original.columns[1]!.id },
+      timeline: { marks: [original.columns[0]!.id] },
+    })
     expect(after.map((e) => e.values)).toEqual(before.map((e) => e.values))
     expect(after.map((e) => e.id)).not.toContain(before[0]!.id)
     expect(before).toHaveLength(after.length)
@@ -56,6 +60,10 @@ describe('transfer', () => {
     ;(withColumnType.logbooks[0]!.logbook.columns[0] as { type: string }).type = 'color'
     const withObjectCell = structuredClone(valid)
     ;(withObjectCell.logbooks[0]!.entries[0]!.values as Record<string, unknown>).x = { a: 1 }
+    const withNumberBinding = structuredClone(valid)
+    ;(withNumberBinding.logbooks[0]!.logbook as { processors: unknown }).processors = {
+      timeline: { marks: ['a', 1] },
+    }
 
     const invalid = [
       'not json',
@@ -63,6 +71,7 @@ describe('transfer', () => {
       JSON.stringify({ ...valid, version: 2 }),
       JSON.stringify(withColumnType),
       JSON.stringify(withObjectCell),
+      JSON.stringify(withNumberBinding),
     ]
     for (const text of invalid) expect(() => parseExport(text)).toThrow(ImportError)
   })

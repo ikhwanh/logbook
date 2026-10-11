@@ -6,7 +6,10 @@ export interface Slot {
   key: string
   label: string
   type: ColumnType
+  alternateTypes?: ColumnType[]
   optional?: boolean
+  // Binds any number of columns, chosen by the user and never auto-picked.
+  multiple?: boolean
 }
 
 export interface Processor<Result = unknown> {
@@ -14,7 +17,7 @@ export interface Processor<Result = unknown> {
   name: string
   description: string
   slots: Slot[]
-  run(entries: Entry[], columns: Record<string, Column>): Result
+  run(entries: Entry[], columns: Record<string, Column>, multi?: Record<string, Column[]>): Result
   isEmpty(result: Result): boolean
 }
 

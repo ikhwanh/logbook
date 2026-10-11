@@ -20,7 +20,7 @@ export interface Logbook {
   name: string
   columns: Column[]
   // Which column each processor slot uses, when the user picked one.
-  processors?: Partial<Record<ProcessorId, Record<string, string>>>
+  processors?: Partial<Record<ProcessorId, Record<string, string | string[]>>>
   createdAt: number
   updatedAt: number
 }

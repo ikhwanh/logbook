@@ -103,10 +103,10 @@ function parseBindings(value: unknown, logbookName: string): Logbook['processors
   if (!isObject(value)) fail(malformed)
   const bindings: NonNullable<Logbook['processors']> = {}
   for (const [processorId, slots] of Object.entries(value)) {
-    if (!isObject(slots) || !Object.values(slots).every((id) => typeof id === 'string')) {
-      fail(malformed)
-    }
-    bindings[processorId as ProcessorId] = slots as Record<string, string>
+    const isId = (id: unknown) => typeof id === 'string'
+    const valid = (id: unknown) => isId(id) || (Array.isArray(id) && id.every(isId))
+    if (!isObject(slots) || !Object.values(slots).every(valid)) fail(malformed)
+    bindings[processorId as ProcessorId] = slots as Record<string, string | string[]>
   }
   return bindings
 }

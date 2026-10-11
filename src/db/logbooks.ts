@@ -22,6 +22,7 @@ export async function createLogbook(name: string): Promise<string> {
       { id: crypto.randomUUID(), name: 'Date', type: 'date' },
       { id: crypto.randomUUID(), name: 'Note', type: 'text' },
     ],
+    views: [],
     createdAt: now,
     updatedAt: now,
   }
@@ -36,6 +37,7 @@ export async function createLogbookFromTemplate(template: ExampleTemplate): Prom
     id: crypto.randomUUID(),
     name: template.name,
     columns: template.columns.map((column) => ({ ...column, id: ids.get(column.id)! })),
+    views: [template.processorId],
     createdAt: now,
     updatedAt: now,
   }
@@ -108,6 +110,26 @@ export function saveBinding(
     .modify((logbook) => {
       logbook.processors ??= {}
       logbook.processors[processorId] = { ...logbook.processors[processorId], [slotKey]: columnId }
+    })
+}
+
+export function addView(logbookId: string, processorId: ProcessorId) {
+  return db.logbooks
+    .where('id')
+    .equals(logbookId)
+    .modify((logbook) => {
+      logbook.views ??= []
+      if (!logbook.views.includes(processorId)) logbook.views.push(processorId)
+    })
+}
+
+// Bindings are kept so re-adding the view restores the user's column choices.
+export function removeView(logbookId: string, processorId: ProcessorId) {
+  return db.logbooks
+    .where('id')
+    .equals(logbookId)
+    .modify((logbook) => {
+      logbook.views = logbook.views?.filter((id) => id !== processorId) ?? []
     })
 }
 

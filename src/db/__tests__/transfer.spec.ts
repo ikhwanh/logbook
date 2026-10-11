@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { db } from '../index'
 import { buildExamples } from '@/processors/examples'
-import { createLogbook, createLogbookFromTemplate, listEntries, saveBinding } from '../logbooks'
+import {
+  addView,
+  createLogbook,
+  createLogbookFromTemplate,
+  listEntries,
+  saveBinding,
+} from '../logbooks'
 import { exportLogbooks, importLogbooks, ImportError, parseExport } from '../transfer'
 
 async function roundTrip(ids?: string[]) {
@@ -37,6 +43,29 @@ describe('transfer', () => {
     expect(before).toHaveLength(after.length)
   })
 
+  it('keeps views in their order', async () => {
+    const id = await createLogbook('Fuel')
+    await addView(id, 'streaks')
+    await addView(id, 'checklist')
+    const [copyId] = await roundTrip([id])
+    expect((await db.logbooks.get(copyId!))?.views).toEqual(['streaks', 'checklist'])
+  })
+
+  it('drops unknown views and gives older exports their supported views', async () => {
+    const id = await createLogbookFromTemplate(buildExamples('2026-10-10').chart)
+    const file = await exportLogbooks([id])
+    const withUnknown = structuredClone(file)
+    withUnknown.logbooks[0]!.logbook.views = ['totals', 'gone', 'totals'] as never
+    const withoutViews = structuredClone(file)
+    delete withoutViews.logbooks[0]!.logbook.views
+
+    expect(parseExport(JSON.stringify(withUnknown)).logbooks[0]!.logbook.views).toEqual(['totals'])
+    expect(parseExport(JSON.stringify(withoutViews)).logbooks[0]!.logbook.views).toEqual([
+      'chart',
+      'totals',
+    ])
+  })
+
   it('creates independent copies when importing the same file twice', async () => {
     const id = await createLogbook('Fuel')
     const file = JSON.stringify(await exportLogbooks([id]))
@@ -65,6 +94,9 @@ describe('transfer', () => {
       timeline: { marks: ['a', 1] },
     }
 
+    const withStringViews = structuredClone(valid)
+    ;(withStringViews.logbooks[0]!.logbook as { views: unknown }).views = 'chart'
+
     const invalid = [
       'not json',
       JSON.stringify({ ...valid, format: 'other' }),
@@ -72,6 +104,7 @@ describe('transfer', () => {
       JSON.stringify(withColumnType),
       JSON.stringify(withObjectCell),
       JSON.stringify(withNumberBinding),
+      JSON.stringify(withStringViews),
     ]
     for (const text of invalid) expect(() => parseExport(text)).toThrow(ImportError)
   })

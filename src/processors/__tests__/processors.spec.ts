@@ -4,7 +4,7 @@ import { resolveBinding } from '../binding'
 import { chart } from '../chart'
 import { checklist } from '../checklist'
 import { buildExamples } from '../examples'
-import { processors } from '../index'
+import { processors, supportedViews } from '../index'
 import { runStreaks } from '../streaks'
 import { runTimeline, timeline } from '../timeline'
 import { runTotals, totals, type TotalsResult } from '../totals'
@@ -351,6 +351,15 @@ describe('streaks', () => {
   })
 })
 
+describe('supportedViews', () => {
+  it('lists the processors whose slots the columns can fill', () => {
+    expect(supportedViews(logbook([col('note', 'text')]))).toEqual([])
+    expect(supportedViews(logbook([col('date', 'date'), col('done', 'checkbox')]))).toContain(
+      'streaks',
+    )
+  })
+})
+
 describe('examples', () => {
   const examples = buildExamples('2026-10-10')
 
@@ -359,6 +368,7 @@ describe('examples', () => {
     const result = resolveBinding(processor, logbook(example.columns))
     expect(result.ok).toBe(true)
     expect(example.rows.length).toBeGreaterThan(0)
+    expect(supportedViews(logbook(example.columns))).toContain(processor.id)
   })
 
   it('is the same every time', () => {

@@ -75,6 +75,7 @@ function trackLabel(item: TimelineItem) {
           <div class="name">{{ item.label }}</div>
           <div
             class="track"
+            :class="{ marked: item.marks.length > 0 }"
             role="progressbar"
             :aria-valuenow="percent(item)"
             aria-valuemin="0"
@@ -89,6 +90,16 @@ function trackLabel(item: TimelineItem) {
               :style="{ left: `${mark.at * 100}%` }"
               :title="markLabel(mark)"
             ></div>
+            <!-- Shifting by its own position keeps a label at either end inside the track. -->
+            <span
+              v-for="mark in item.marks"
+              :key="`label-${mark.column.id}`"
+              class="mark-label"
+              :style="{ left: `${mark.at * 100}%`, transform: `translateX(-${mark.at * 100}%)` }"
+              aria-hidden="true"
+            >
+              {{ mark.column.name }}
+            </span>
           </div>
           <div class="status">{{ status(item) }}</div>
           <div class="range">{{ range(item) }}</div>
@@ -192,6 +203,16 @@ li {
   inset: 0 -0.25rem;
 }
 
+.mark-label {
+  position: absolute;
+  bottom: calc(100% + 0.375rem);
+  color: var(--muted);
+  font-size: 0.6875rem;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .status {
   grid-area: status;
   font-size: 0.875rem;
@@ -224,6 +245,10 @@ li {
       'track track'
       'range range';
     row-gap: 0.25rem;
+  }
+
+  .track.marked {
+    margin-top: 1rem;
   }
 }
 </style>

@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
+import { supportedViews } from '@/processors'
 import type { ProcessorId } from '@/processors/types'
 
 export interface Setting {
@@ -21,6 +22,8 @@ export interface Logbook {
   columns: Column[]
   // Which column each processor slot uses, when the user picked one.
   processors?: Partial<Record<ProcessorId, Record<string, string | string[]>>>
+  // Tabs shown after the always-present Table, in the order they were added.
+  views?: ProcessorId[]
   createdAt: number
   updatedAt: number
 }
@@ -41,8 +44,8 @@ export class LogbookDB extends Dexie {
   logbooks!: EntityTable<Logbook, 'id'>
   entries!: EntityTable<Entry, 'id'>
 
-  constructor() {
-    super('logbook')
+  constructor(name = 'logbook') {
+    super(name)
     // Add new tables or indexes in a new version(n) block; never edit a shipped version.
     this.version(1).stores({
       settings: 'key',
@@ -51,6 +54,21 @@ export class LogbookDB extends Dexie {
       logbooks: 'id, updatedAt',
       entries: 'id, [logbookId+createdAt]',
     })
+    // Views used to be hidden globally from settings; each logbook now starts
+    // with the views its columns already support, minus the ones that were hidden.
+    this.version(3)
+      .stores({})
+      .upgrade(async (tx) => {
+        const hidden = (await tx.table<Setting, string>('settings').get('hiddenViews'))?.value
+        const isHidden = (id: ProcessorId) => Array.isArray(hidden) && hidden.includes(id)
+        await tx
+          .table<Logbook, string>('logbooks')
+          .toCollection()
+          .modify((logbook) => {
+            logbook.views = supportedViews(logbook).filter((id) => !isHidden(id))
+          })
+        await tx.table('settings').delete('hiddenViews')
+      })
   }
 }
 

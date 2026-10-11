@@ -1,4 +1,5 @@
 import { columnTypeIds } from '@/logbook/columnTypes'
+import { findProcessor, supportedViews } from '@/processors'
 import type { ProcessorId } from '@/processors/types'
 import { db, type CellValue, type Column, type ColumnType, type Entry, type Logbook } from './index'
 import { listEntries, listLogbooks } from './logbooks'
@@ -111,6 +112,17 @@ function parseBindings(value: unknown, logbookName: string): Logbook['processors
   return bindings
 }
 
+// Exports from before views were per logbook have none, so they get the views
+// their columns support, the same as the database migration.
+function parseViews(value: unknown, logbook: Logbook): ProcessorId[] {
+  if (value === undefined) return supportedViews(logbook)
+  if (!Array.isArray(value) || !value.every((id) => typeof id === 'string')) {
+    fail(`The views of "${logbook.name}" are malformed.`)
+  }
+  const known = value.filter((id: string) => findProcessor(id))
+  return [...new Set(known)] as ProcessorId[]
+}
+
 function parseLogbook(value: unknown): Logbook {
   if (!isObject(value)) fail('A logbook is malformed.')
   const name = text(value.name, 'A logbook name')
@@ -124,6 +136,7 @@ function parseLogbook(value: unknown): Logbook {
   }
   const processors = parseBindings(value.processors, name)
   if (processors) logbook.processors = processors
+  logbook.views = parseViews(value.views, logbook)
   return logbook
 }
 

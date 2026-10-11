@@ -1,16 +1,11 @@
 <script setup lang="ts">
-import { setTheme, setViewHidden, themes, type Theme } from '@/db/settings'
-import { processors, type ProcessorId } from '@/processors'
+import { setTheme, themes, type Theme } from '@/db/settings'
 import { settings } from '@/settings'
 
 const themeLabels: Record<Theme, string> = {
   system: 'System',
   light: 'Light',
   dark: 'Dark',
-}
-
-function toggleView(id: ProcessorId, event: Event) {
-  setViewHidden(id, !(event.target as HTMLInputElement).checked)
 }
 </script>
 
@@ -33,35 +28,6 @@ function toggleView(id: ProcessorId, event: Event) {
         </label>
       </div>
       <p class="meta">System follows your device's light or dark mode.</p>
-    </fieldset>
-
-    <fieldset>
-      <legend>Views</legend>
-      <p class="meta">Choose which tabs appear on every logbook.</p>
-      <ul class="options views">
-        <li>
-          <label>
-            <input type="checkbox" checked disabled />
-            <span>
-              <span class="name">Table</span>
-              <span class="meta">Always shown. This is where rows are added and edited.</span>
-            </span>
-          </label>
-        </li>
-        <li v-for="processor in processors" :key="processor.id">
-          <label>
-            <input
-              type="checkbox"
-              :checked="!settings.hiddenViews.includes(processor.id)"
-              @change="toggleView(processor.id, $event)"
-            />
-            <span>
-              <span class="name">{{ processor.name }}</span>
-              <span class="meta">{{ processor.description }}</span>
-            </span>
-          </label>
-        </li>
-      </ul>
     </fieldset>
   </main>
 </template>
@@ -133,42 +99,8 @@ legend {
   font-weight: 600;
 }
 
-.views li + li {
-  border-top: 1px solid var(--border);
-}
-
-.views label {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  cursor: pointer;
-}
-
-.views label:has(:disabled) {
-  cursor: default;
-}
-
-.views label > span {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.views .meta {
-  margin: 0;
-}
-
-.name {
-  font-weight: 600;
-}
-
 input {
-  margin: 0.1875rem 0 0;
-  accent-color: var(--accent);
-}
-
-.themes input {
   margin: 0;
+  accent-color: var(--accent);
 }
 </style>

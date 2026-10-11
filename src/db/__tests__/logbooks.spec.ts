@@ -3,6 +3,7 @@ import { db } from '../index'
 import { buildExamples } from '@/processors/examples'
 import {
   addEntry,
+  addView,
   createLogbook,
   createLogbookFromTemplate,
   deleteColumn,
@@ -10,6 +11,7 @@ import {
   deleteLogbook,
   listEntries,
   moveColumn,
+  removeView,
   saveBinding,
   saveColumn,
   updateCell,
@@ -28,6 +30,7 @@ describe('logbooks', () => {
     const logbook = await db.logbooks.get(id)
     expect(logbook?.name).toBe('Fuel')
     expect(logbook?.columns.map((c) => c.type)).toEqual(['date', 'text'])
+    expect(logbook?.views).toEqual([])
   })
 
   it('sets and clears a cell', async () => {
@@ -120,6 +123,7 @@ describe('logbooks', () => {
     expect(entries).toHaveLength(template.rows.length)
     const dateColumn = logbook.columns.find((c) => c.name === 'Date')!
     expect(entries[0]!.values[dateColumn.id]).toBe(template.rows[0]!.date)
+    expect(logbook.views).toEqual(['chart'])
   })
 
   it('saves a processor binding per slot', async () => {
@@ -130,5 +134,24 @@ describe('logbooks', () => {
 
     await saveBinding(id, 'timeline', 'marks', ['c', 'd'])
     expect((await db.logbooks.get(id))?.processors?.timeline).toEqual({ marks: ['c', 'd'] })
+  })
+
+  it('adds views once, in the order they were added', async () => {
+    const id = await createLogbook('Fuel')
+    await addView(id, 'totals')
+    await addView(id, 'chart')
+    await addView(id, 'totals')
+    expect((await db.logbooks.get(id))?.views).toEqual(['totals', 'chart'])
+  })
+
+  it('removes a view but keeps its bindings', async () => {
+    const id = await createLogbook('Fuel')
+    await addView(id, 'chart')
+    await addView(id, 'streaks')
+    await saveBinding(id, 'chart', 'value', 'a')
+    await removeView(id, 'chart')
+    const logbook = await db.logbooks.get(id)
+    expect(logbook?.views).toEqual(['streaks'])
+    expect(logbook?.processors).toEqual({ chart: { value: 'a' } })
   })
 })

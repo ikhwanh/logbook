@@ -5,6 +5,7 @@ import {
   addEntry,
   deleteColumn,
   deleteEntries,
+  duplicateEntries,
   moveColumn,
   saveColumn,
   updateCell,
@@ -82,6 +83,11 @@ async function removeSelected() {
   if (rows.some((e) => Object.keys(e.values).length > 0) && !confirm(`Delete ${label}?`)) return
   await deleteEntries(rows.map((e) => e.id))
   selectedIds.value.clear()
+}
+
+async function duplicateSelected() {
+  const ids = await duplicateEntries(selectedEntries.value)
+  selectedIds.value = new Set(ids)
 }
 
 function onCellKeydown(event: KeyboardEvent, rowIndex: number, columnId: string) {
@@ -185,6 +191,7 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', flushOnHi
   <div v-if="selectedEntries.length > 0" class="selection-bar">
     <span class="selection-count">{{ selectedEntries.length }} selected</span>
     <button @click="selectedIds.clear()">Clear</button>
+    <button @click="duplicateSelected">Duplicate</button>
     <button class="danger" @click="removeSelected">Delete</button>
   </div>
 

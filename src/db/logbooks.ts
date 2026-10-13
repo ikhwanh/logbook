@@ -171,3 +171,22 @@ export function updateCell(entry: Entry, columnId: string, value: CellValue | un
 export function deleteEntries(ids: string[]) {
   return db.entries.bulkDelete(ids)
 }
+
+export async function duplicateEntries(entries: Entry[]): Promise<string[]> {
+  const logbookId = entries[0]?.logbookId
+  if (!logbookId) return []
+  const now = Date.now()
+  // Each copy is a millisecond apart so they keep the originals' order.
+  const copies: Entry[] = entries.map((entry, i) => ({
+    id: crypto.randomUUID(),
+    logbookId,
+    values: { ...entry.values },
+    createdAt: now + i,
+    updatedAt: now,
+  }))
+  await db.transaction('rw', db.logbooks, db.entries, async () => {
+    await db.entries.bulkAdd(copies)
+    await db.logbooks.update(logbookId, { updatedAt: now })
+  })
+  return copies.map((e) => e.id)
+}

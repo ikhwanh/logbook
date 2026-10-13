@@ -9,6 +9,7 @@ import {
   deleteColumn,
   deleteEntries,
   deleteLogbook,
+  duplicateEntries,
   listEntries,
   moveColumn,
   removeView,
@@ -110,6 +111,27 @@ describe('logbooks', () => {
     const c = await addEntry(logbookId)
     await deleteEntries([a, c])
     expect((await listEntries(logbookId)).map((e) => e.id)).toEqual([b])
+  })
+
+  it('duplicates entries at the end in their original order', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(1000)
+    const logbookId = await createLogbook('Fuel')
+    const a = await addEntry(logbookId)
+    vi.setSystemTime(2000)
+    const b = await addEntry(logbookId)
+    vi.setSystemTime(3000)
+    const c = await addEntry(logbookId)
+    await updateCell((await db.entries.get(a))!, 'liters', 10)
+    await updateCell((await db.entries.get(c))!, 'liters', 30)
+
+    vi.setSystemTime(4000)
+    const copies = await duplicateEntries([(await db.entries.get(a))!, (await db.entries.get(c))!])
+
+    const entries = await listEntries(logbookId)
+    expect(entries.map((e) => e.id)).toEqual([a, b, c, ...copies])
+    expect(entries.slice(3).map((e) => e.values)).toEqual([{ liters: 10 }, { liters: 30 }])
+    expect((await db.logbooks.get(logbookId))?.updatedAt).toBe(4000)
   })
 
   it('creates a logbook from a template with fresh column ids', async () => {

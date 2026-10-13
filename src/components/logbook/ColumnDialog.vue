@@ -1,19 +1,23 @@
 <script setup lang="ts">
 import { computed, ref, useTemplateRef } from 'vue'
-import type { Column, ColumnType } from '@/db'
+import type { Column, ColumnType, SortOrder } from '@/db'
 import { columnTypeIds, columnTypes } from '@/logbook/columnTypes'
 
-const props = defineProps<{ columns: Column[] }>()
+const props = defineProps<{ columns: Column[]; sort?: SortOrder }>()
 
 const emit = defineEmits<{
   save: [column: Column]
   delete: [columnId: string]
   move: [columnId: string, offset: -1 | 1]
+  sort: [sort: SortOrder | undefined]
 }>()
 
 const dialog = useTemplateRef('dialog')
 const editing = ref<Column>()
 const index = computed(() => props.columns.findIndex((c) => c.id === editing.value?.id))
+const sortDirection = computed(() =>
+  props.sort && props.sort.columnId === editing.value?.id ? props.sort.direction : undefined,
+)
 const name = ref('')
 const type = ref<ColumnType>('text')
 const optionsText = ref('')
@@ -96,6 +100,29 @@ defineExpose({ open })
             @click="emit('move', editing.id, 1)"
           >
             Move right →
+          </button>
+        </div>
+      </div>
+
+      <div v-if="editing" class="field">
+        Sort
+        <div class="move">
+          <button
+            type="button"
+            :aria-pressed="sortDirection === 'asc'"
+            @click="emit('sort', { columnId: editing.id, direction: 'asc' })"
+          >
+            ↑ Ascending
+          </button>
+          <button
+            type="button"
+            :aria-pressed="sortDirection === 'desc'"
+            @click="emit('sort', { columnId: editing.id, direction: 'desc' })"
+          >
+            ↓ Descending
+          </button>
+          <button type="button" :disabled="!sortDirection" @click="emit('sort', undefined)">
+            Clear
           </button>
         </div>
       </div>
@@ -193,6 +220,12 @@ textarea {
 .move button {
   flex: 1;
   font-weight: normal;
+}
+
+.move button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .spacer {

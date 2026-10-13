@@ -8,13 +8,22 @@ import {
   duplicateEntries,
   moveColumn,
   saveColumn,
+  setSort,
   updateCell,
 } from '@/db/logbooks'
 import { columnTypes } from '@/logbook/columnTypes'
+import { sortEntries } from '@/logbook/sort'
 import CellInput from './CellInput.vue'
 import ColumnDialog from './ColumnDialog.vue'
 
 const props = defineProps<{ logbook: Logbook; entries: Entry[] }>()
+const rows = computed(() => sortEntries(props.entries, props.logbook))
+
+function ariaSort(columnId: string) {
+  const { sort } = props.logbook
+  if (sort?.columnId !== columnId) return undefined
+  return sort.direction === 'asc' ? 'ascending' : 'descending'
+}
 
 const scroller = useTemplateRef('scroller')
 const columnDialog = useTemplateRef('columnDialog')
@@ -48,19 +57,19 @@ async function addRow(columnId = props.logbook.columns[0]?.id) {
 
 const selectedIds = ref(new Set<string>())
 // Filtering through entries drops ids of rows that were deleted elsewhere.
-const selectedEntries = computed(() => props.entries.filter((e) => selectedIds.value.has(e.id)))
+const selectedEntries = computed(() => rows.value.filter((e) => selectedIds.value.has(e.id)))
 const allSelected = computed(
-  () => props.entries.length > 0 && selectedEntries.value.length === props.entries.length,
+  () => rows.value.length > 0 && selectedEntries.value.length === rows.value.length,
 )
 let anchorId: string | undefined
 
 function toggleRow(event: MouseEvent, entry: Entry) {
   const checked = (event.target as HTMLInputElement).checked
-  const index = props.entries.indexOf(entry)
-  const anchor = props.entries.findIndex((e) => e.id === anchorId)
+  const index = rows.value.indexOf(entry)
+  const anchor = rows.value.findIndex((e) => e.id === anchorId)
   const range =
     event.shiftKey && anchor !== -1
-      ? props.entries.slice(Math.min(anchor, index), Math.max(anchor, index) + 1)
+      ? rows.value.slice(Math.min(anchor, index), Math.max(anchor, index) + 1)
       : [entry]
   for (const { id } of range) {
     if (checked) selectedIds.value.add(id)
@@ -71,17 +80,19 @@ function toggleRow(event: MouseEvent, entry: Entry) {
 
 function toggleAll(event: Event) {
   if ((event.target as HTMLInputElement).checked) {
-    selectedIds.value = new Set(props.entries.map((e) => e.id))
+    selectedIds.value = new Set(rows.value.map((e) => e.id))
   } else {
     selectedIds.value.clear()
   }
 }
 
 async function removeSelected() {
-  const rows = selectedEntries.value
-  const label = rows.length === 1 ? 'this row' : `${rows.length} rows`
-  if (rows.some((e) => Object.keys(e.values).length > 0) && !confirm(`Delete ${label}?`)) return
-  await deleteEntries(rows.map((e) => e.id))
+  const selected = selectedEntries.value
+  const label = selected.length === 1 ? 'this row' : `${selected.length} rows`
+  if (selected.some((e) => Object.keys(e.values).length > 0) && !confirm(`Delete ${label}?`)) {
+    return
+  }
+  await deleteEntries(selected.map((e) => e.id))
   selectedIds.value.clear()
 }
 
@@ -92,7 +103,7 @@ async function duplicateSelected() {
 
 function onCellKeydown(event: KeyboardEvent, rowIndex: number, columnId: string) {
   if (event.key !== 'Enter' || event.isComposing) return
-  const next = props.entries[rowIndex + (event.shiftKey ? -1 : 1)]
+  const next = rows.value[rowIndex + (event.shiftKey ? -1 : 1)]
   if (next) focusCell(next.id, columnId)
   else if (!event.shiftKey) addRow(columnId)
 }
@@ -130,6 +141,7 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', flushOnHi
             v-for="column in logbook.columns"
             :key="column.id"
             scope="col"
+            :aria-sort="ariaSort(column.id)"
             :style="{
               width: columnTypes[column.type].width,
               minWidth: columnTypes[column.type].width,
@@ -137,7 +149,13 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', flushOnHi
           >
             <button class="column-header" @click="columnDialog?.open(column)">
               <span class="column-name">{{ column.name }}</span>
-              <span class="column-type">{{ columnTypes[column.type].label }}</span>
+              <span class="column-type">
+                {{ columnTypes[column.type].label }}
+                <!-- Shown on the type line so a long, truncated name can't hide it. -->
+                <span v-if="ariaSort(column.id)" class="sort-mark" aria-hidden="true">
+                  {{ logbook.sort?.direction === 'asc' ? '↑' : '↓' }}
+                </span>
+              </span>
             </button>
           </th>
           <th class="filler">
@@ -154,7 +172,7 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', flushOnHi
       </thead>
       <tbody>
         <tr
-          v-for="(entry, rowIndex) in entries"
+          v-for="(entry, rowIndex) in rows"
           :key="entry.id"
           :class="{ selected: selectedIds.has(entry.id) }"
         >
@@ -198,6 +216,8 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', flushOnHi
   <ColumnDialog
     ref="columnDialog"
     :columns="logbook.columns"
+    :sort="logbook.sort"
+    @sort="(sort) => setSort(logbook.id, sort)"
     @save="(column) => saveColumn(logbook.id, column)"
     @delete="(columnId) => deleteColumn(logbook.id, columnId)"
     @move="(columnId, offset) => moveColumn(logbook.id, columnId, offset)"
@@ -299,6 +319,11 @@ tbody .filler {
 .column-type {
   color: var(--muted);
   font-size: 0.75rem;
+}
+
+.sort-mark {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .add-column {

@@ -1,7 +1,15 @@
 import { columnTypeIds } from '@/logbook/columnTypes'
 import { findProcessor, supportedViews } from '@/processors'
 import type { ProcessorId } from '@/processors/types'
-import { db, type CellValue, type Column, type ColumnType, type Entry, type Logbook } from './index'
+import {
+  db,
+  type CellValue,
+  type Column,
+  type ColumnType,
+  type Entry,
+  type Logbook,
+  type SortOrder,
+} from './index'
 import { listEntries, listLogbooks } from './logbooks'
 
 const FORMAT = 'logbook-export'
@@ -123,6 +131,21 @@ function parseViews(value: unknown, logbook: Logbook): ProcessorId[] {
   return [...new Set(known)] as ProcessorId[]
 }
 
+// A sort on a column the file doesn't have is dropped rather than rejected,
+// since the table would ignore it anyway.
+function parseSort(value: unknown, logbook: Logbook): SortOrder | undefined {
+  if (value === undefined) return undefined
+  if (
+    !isObject(value) ||
+    typeof value.columnId !== 'string' ||
+    (value.direction !== 'asc' && value.direction !== 'desc')
+  ) {
+    fail(`The sort of "${logbook.name}" is malformed.`)
+  }
+  if (!logbook.columns.some((c) => c.id === value.columnId)) return undefined
+  return { columnId: value.columnId, direction: value.direction }
+}
+
 function parseLogbook(value: unknown): Logbook {
   if (!isObject(value)) fail('A logbook is malformed.')
   const name = text(value.name, 'A logbook name')
@@ -137,6 +160,8 @@ function parseLogbook(value: unknown): Logbook {
   const processors = parseBindings(value.processors, name)
   if (processors) logbook.processors = processors
   logbook.views = parseViews(value.views, logbook)
+  const sort = parseSort(value.sort, logbook)
+  if (sort) logbook.sort = sort
   return logbook
 }
 

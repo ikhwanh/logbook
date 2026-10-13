@@ -15,6 +15,7 @@ import {
   removeView,
   saveBinding,
   saveColumn,
+  setSort,
   updateCell,
 } from '../logbooks'
 
@@ -91,6 +92,23 @@ describe('logbooks', () => {
     const [first] = (await db.logbooks.get(logbookId))!.columns
     await moveColumn(logbookId, first!.id, -1)
     expect(await names()).toEqual(['Date', 'Note', 'Liters'])
+  })
+
+  it('sets and clears the sort, and clears it with its column', async () => {
+    const logbookId = await createLogbook('Fuel')
+    const [date, note] = (await db.logbooks.get(logbookId))!.columns
+    const sort = async () => (await db.logbooks.get(logbookId))!.sort
+
+    await setSort(logbookId, { columnId: date!.id, direction: 'desc' })
+    expect(await sort()).toEqual({ columnId: date!.id, direction: 'desc' })
+    await setSort(logbookId, undefined)
+    expect(await sort()).toBeUndefined()
+
+    await setSort(logbookId, { columnId: note!.id, direction: 'asc' })
+    await deleteColumn(logbookId, date!.id)
+    expect(await sort()).toEqual({ columnId: note!.id, direction: 'asc' })
+    await deleteColumn(logbookId, note!.id)
+    expect(await sort()).toBeUndefined()
   })
 
   it('deletes a logbook with its entries only', async () => {

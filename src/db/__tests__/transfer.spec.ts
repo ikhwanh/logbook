@@ -7,6 +7,7 @@ import {
   createLogbookFromTemplate,
   listEntries,
   saveBinding,
+  setSort,
 } from '../logbooks'
 import { exportLogbooks, importLogbooks, ImportError, parseExport } from '../transfer'
 
@@ -66,6 +67,18 @@ describe('transfer', () => {
     ])
   })
 
+  it('keeps the sort and drops one on an unknown column', async () => {
+    const id = await createLogbook('Fuel')
+    const columnId = (await db.logbooks.get(id))!.columns[1]!.id
+    await setSort(id, { columnId, direction: 'desc' })
+    const [copyId] = await roundTrip([id])
+    expect((await db.logbooks.get(copyId!))?.sort).toEqual({ columnId, direction: 'desc' })
+
+    const file = await exportLogbooks([id])
+    file.logbooks[0]!.logbook.sort = { columnId: 'gone', direction: 'asc' }
+    expect(parseExport(JSON.stringify(file)).logbooks[0]!.logbook).not.toHaveProperty('sort')
+  })
+
   it('creates independent copies when importing the same file twice', async () => {
     const id = await createLogbook('Fuel')
     const file = JSON.stringify(await exportLogbooks([id]))
@@ -96,6 +109,11 @@ describe('transfer', () => {
 
     const withStringViews = structuredClone(valid)
     ;(withStringViews.logbooks[0]!.logbook as { views: unknown }).views = 'chart'
+    const withBadSort = structuredClone(valid)
+    ;(withBadSort.logbooks[0]!.logbook as { sort: unknown }).sort = {
+      columnId: valid.logbooks[0]!.logbook.columns[0]!.id,
+      direction: 'up',
+    }
 
     const invalid = [
       'not json',
@@ -105,6 +123,7 @@ describe('transfer', () => {
       JSON.stringify(withObjectCell),
       JSON.stringify(withNumberBinding),
       JSON.stringify(withStringViews),
+      JSON.stringify(withBadSort),
     ]
     for (const text of invalid) expect(() => parseExport(text)).toThrow(ImportError)
   })

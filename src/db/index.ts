@@ -16,6 +16,11 @@ export interface Column {
   options?: string[]
 }
 
+export interface SortOrder {
+  columnId: string
+  direction: 'asc' | 'desc'
+}
+
 export interface Logbook {
   id: string
   name: string
@@ -24,6 +29,8 @@ export interface Logbook {
   processors?: Partial<Record<ProcessorId, Record<string, string | string[]>>>
   // Tabs shown after the always-present Table, in the order they were added.
   views?: ProcessorId[]
+  // How the table orders rows; unset means creation order.
+  sort?: SortOrder
   createdAt: number
   updatedAt: number
 }

@@ -1,6 +1,6 @@
 import Dexie from 'dexie'
 import type { ExampleTemplate, ProcessorId } from '@/processors/types'
-import { db, type CellValue, type Column, type Entry, type Logbook } from './index'
+import { db, type CellValue, type Column, type Entry, type Logbook, type SortOrder } from './index'
 
 export function listLogbooks() {
   return db.logbooks.orderBy('updatedAt').reverse().toArray()
@@ -133,12 +133,23 @@ export function removeView(logbookId: string, processorId: ProcessorId) {
     })
 }
 
+export function setSort(logbookId: string, sort: SortOrder | undefined) {
+  return db.logbooks
+    .where('id')
+    .equals(logbookId)
+    .modify((logbook) => {
+      if (sort) logbook.sort = sort
+      else delete logbook.sort
+    })
+}
+
 export function deleteColumn(logbookId: string, columnId: string) {
   return db.logbooks
     .where('id')
     .equals(logbookId)
     .modify((logbook) => {
       logbook.columns = logbook.columns.filter((c) => c.id !== columnId)
+      if (logbook.sort?.columnId === columnId) delete logbook.sort
       logbook.updatedAt = Date.now()
     })
 }

@@ -43,11 +43,11 @@ export interface TimelineResult {
   ended: number
 }
 
-// Dates and numbers both count days with the start day as day 1, so a date
-// column and a number column holding the same point read the same.
-function dayCount(value: CellValue | undefined, start: string): number | undefined {
-  if (typeof value === 'string') return toDayNumber(value) - toDayNumber(start) + 1
-  if (typeof value === 'number' && Number.isFinite(value)) return Math.ceil(value)
+// A number counts days after the start, so a date column and a number column
+// holding the same point read the same.
+function dateFrom(value: CellValue | undefined, start: string): string | undefined {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' && Number.isFinite(value)) return addDays(start, Math.ceil(value))
   return undefined
 }
 
@@ -79,11 +79,11 @@ export function runTimeline(
     const label = String(readCell(entry, columns.item!) ?? '').trim()
     const start = readCell(entry, columns.start!)
     if (label === '' || typeof start !== 'string') continue
-    const length = dayCount(readCell(entry, columns.end!), start)
-    if (length === undefined || length < 1) continue
-    const end = addDays(start, length - 1)
+    const end = dateFrom(readCell(entry, columns.end!), start)
+    if (end === undefined || end < start) continue
     const startsIn = toDayNumber(start) - now
-    const endsIn = startsIn + length - 1
+    const endsIn = toDayNumber(end) - now
+    const length = endsIn - startsIn + 1
     const elapsed = Math.min(Math.max(1 - startsIn, 0), length)
     const item: TimelineItem = {
       entry,
@@ -96,8 +96,9 @@ export function runTimeline(
       endsIn,
       marks: marks.flatMap((column) => {
         const value = readCell(entry, column)
-        const count = dayCount(value, start)
-        if (value === undefined || count === undefined) return []
+        const date = dateFrom(value, start)
+        if (value === undefined || date === undefined) return []
+        const count = toDayNumber(date) - toDayNumber(start) + 1
         return [{ column, value, at: Math.min(Math.max(count / length, 0), 1) }]
       }),
     }

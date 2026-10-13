@@ -219,7 +219,7 @@ describe('timeline', () => {
     expect(result.items.map((item) => item.label)).toEqual(['First', 'Second'])
   })
 
-  it('reads a number end as a length in days, counting the start day', () => {
+  it('reads a number end as days after the start', () => {
     const result = run(
       [
         { i: 'Three', s: '2026-10-08', e: 3 },
@@ -233,10 +233,11 @@ describe('timeline', () => {
       { ...columns, end: col('e', 'number') },
     )
     const byLabel = Object.fromEntries(result.items.map((item) => [item.label, item]))
-    expect(Object.keys(byLabel)).toEqual(['Partial', 'Three', 'One'])
-    expect(byLabel.Three).toMatchObject({ end: '2026-10-10', status: 'active', endsIn: 0 })
-    expect(byLabel.One).toMatchObject({ start: '2026-10-10', end: '2026-10-10' })
-    expect(byLabel.Partial!.end).toBe('2026-10-03')
+    expect(Object.keys(byLabel)).toEqual(['Zero', 'Partial', 'Three', 'One'])
+    expect(byLabel.Three).toMatchObject({ end: '2026-10-11', status: 'active', endsIn: 1 })
+    expect(byLabel.One).toMatchObject({ start: '2026-10-10', end: '2026-10-11' })
+    expect(byLabel.Partial!.end).toBe('2026-10-04')
+    expect(byLabel.Zero).toMatchObject({ start: '2026-10-01', end: '2026-10-01' })
   })
 
   it('places marks from date and number columns along the bar', () => {
@@ -248,7 +249,7 @@ describe('timeline', () => {
         [days, date],
       ).items[0]!.marks.map((mark) => [mark.column.id, mark.at])
 
-    expect(at({ d: '2026-10-03', n: 3 })).toEqual([
+    expect(at({ d: '2026-10-03', n: 2 })).toEqual([
       ['n', 0.3],
       ['d', 0.3],
     ])

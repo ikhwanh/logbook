@@ -12,7 +12,7 @@ import StatTile from './StatTile.vue'
 
 const props = defineProps<{ result: TimelineResult; columns: Record<string, Column> }>()
 
-// A number column holds a length in days, so its name ("Days") can't stand in for the end.
+// A number column counts days after the start, so its name ("Days") can't stand in for the end.
 const endName = computed(() =>
   props.columns.end!.type === 'date' ? props.columns.end!.name.toLowerCase() : 'end',
 )

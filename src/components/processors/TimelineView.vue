@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Column } from '@/db'
-import type { TimelineItem, TimelineMark, TimelineResult } from '@/processors/timeline'
+import type {
+  TimelineItem,
+  TimelineMark,
+  TimelineResult,
+  TimelineRoutine,
+} from '@/processors/timeline'
 import { formatShortDate } from './format'
 import StatTile from './StatTile.vue'
 
@@ -33,6 +38,10 @@ function status(item: TimelineItem) {
 function range(item: TimelineItem) {
   const start = formatShortDate(item.start)
   return item.start === item.end ? start : `${start} – ${formatShortDate(item.end)}`
+}
+
+function due(routine: TimelineRoutine) {
+  return routine.dueIn === 0 ? 'Today' : `In ${days(routine.dueIn)}`
 }
 
 const percent = (item: TimelineItem) => Math.round(item.fraction * 100)
@@ -105,6 +114,27 @@ function trackLabel(item: TimelineItem) {
           <div class="range">{{ range(item) }}</div>
         </li>
       </ul>
+    </figure>
+
+    <figure v-if="result.hasRoutines" class="card">
+      <figcaption>
+        <span class="title">Routines</span>
+        <span class="subtitle">next dates until {{ endName }}</span>
+      </figcaption>
+      <ul v-if="result.routines.length" class="routines">
+        <li
+          v-for="routine in result.routines"
+          :key="`${routine.item.entry.id}-${routine.column.id}-${routine.date}`"
+        >
+          <div class="date">{{ formatShortDate(routine.date) }}</div>
+          <div class="name">
+            {{ routine.item.label }} · {{ routine.column.name }}
+            <span class="every">every {{ days(routine.every) }}</span>
+          </div>
+          <div class="status">{{ due(routine) }}</div>
+        </li>
+      </ul>
+      <p v-else class="empty">No routines coming up</p>
     </figure>
   </div>
 </template>
@@ -235,6 +265,27 @@ li {
 
 .ended .fill {
   background: var(--muted);
+}
+
+/* Routine rows reuse the item row's area names so .name and .status place themselves. */
+.routines li {
+  grid-template-columns: 4rem 1fr auto;
+  grid-template-areas: 'date name status';
+}
+
+.date {
+  grid-area: date;
+  font-variant-numeric: tabular-nums;
+}
+
+.every {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.empty {
+  margin: 0;
+  color: var(--muted);
 }
 
 @media (max-width: 30rem) {

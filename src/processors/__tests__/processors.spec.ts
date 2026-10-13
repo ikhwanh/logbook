@@ -117,6 +117,24 @@ describe('resolveBinding', () => {
     ])
   })
 
+  it('binds routines only to saved number columns not used elsewhere', () => {
+    const columns = [
+      col('name', 'text'),
+      col('from', 'date'),
+      col('days', 'number'),
+      col('water', 'number'),
+      col('feed', 'number'),
+    ]
+    const none = resolveBinding(timeline, logbook(columns))
+    expect(none.ok && none.multi.routines).toEqual([])
+
+    const saved = {
+      timeline: { end: 'days', marks: ['water'], routines: ['feed', 'days', 'water'] },
+    }
+    const result = resolveBinding(timeline, logbook(columns, saved))
+    expect(result.ok && result.multi.routines!.map((c) => c.id)).toEqual(['feed'])
+  })
+
   it('auto-picks optional slots unless None was saved', () => {
     const columns = [col('c', 'select'), col('a', 'number'), col('t', 'select'), col('d', 'date')]
     const auto = resolveBinding(totals, logbook(columns))
@@ -167,8 +185,12 @@ describe('checklist', () => {
 describe('timeline', () => {
   const columns = { item: col('i', 'text'), start: col('s', 'date'), end: col('e', 'date') }
   // 2026-10-10 is today in every case.
-  const run = (rows: Record<string, CellValue>[], marks: Column[] = [], cols = columns) =>
-    runTimeline(entries(rows), cols, marks, '2026-10-10')
+  const run = (
+    rows: Record<string, CellValue>[],
+    marks: Column[] = [],
+    cols = columns,
+    routines: Column[] = [],
+  ) => runTimeline(entries(rows), cols, marks, routines, '2026-10-10')
 
   it('counts elapsed days inclusively and clamps before the start and after the end', () => {
     const result = run([
@@ -236,6 +258,81 @@ describe('timeline', () => {
     ])
     expect(at({ d: 'soon' })).toEqual([])
     expect(run([{ i: 'A', s: '2026-10-01', e: '2026-10-10' }]).items[0]!.marks).toEqual([])
+  })
+
+  describe('routines', () => {
+    const water = col('w', 'number')
+    const feed = col('f', 'number')
+    const routines = (rows: Record<string, CellValue>[]) =>
+      run(rows, [], columns, [water, feed]).routines.map((r) => [
+        r.item.label,
+        r.column.id,
+        r.date,
+        r.dueIn,
+      ])
+
+    it('lists the next few dates after today, every N days from the start', () => {
+      expect(routines([{ i: 'A', s: '2026-10-01', e: '2026-10-31', w: 5 }])).toEqual([
+        ['A', 'w', '2026-10-11', 1],
+        ['A', 'w', '2026-10-16', 6],
+        ['A', 'w', '2026-10-21', 11],
+      ])
+    })
+
+    it('counts a date falling today and starts after the start for upcoming items', () => {
+      expect(routines([{ i: 'A', s: '2026-10-05', e: '2026-10-31', w: 5 }])[0]).toEqual([
+        'A',
+        'w',
+        '2026-10-10',
+        0,
+      ])
+      expect(routines([{ i: 'B', s: '2026-10-20', e: '2026-10-31', w: 7 }])).toEqual([
+        ['B', 'w', '2026-10-27', 17],
+      ])
+    })
+
+    it('stops at the end date', () => {
+      expect(routines([{ i: 'A', s: '2026-10-01', e: '2026-10-12', w: 5 }])).toEqual([
+        ['A', 'w', '2026-10-11', 1],
+      ])
+      expect(routines([{ i: 'A', s: '2026-09-01', e: '2026-09-30', w: 5 }])).toEqual([])
+    })
+
+    it('merges several routines per row and across rows by date', () => {
+      const result = routines([
+        { i: 'B', s: '2026-10-01', e: '2026-10-31', w: 4 },
+        { i: 'A', s: '2026-10-01', e: '2026-10-31', w: 6, f: 3 },
+      ])
+      expect(result.slice(0, 4)).toEqual([
+        ['A', 'f', '2026-10-10', 0],
+        ['A', 'f', '2026-10-13', 3],
+        ['A', 'w', '2026-10-13', 3],
+        ['B', 'w', '2026-10-13', 3],
+      ])
+      expect(result).toHaveLength(9)
+    })
+
+    it('rounds fractional intervals up and skips unusable ones', () => {
+      expect(routines([{ i: 'A', s: '2026-10-01', e: '2026-10-31', w: 4.2 }])[0]).toEqual([
+        'A',
+        'w',
+        '2026-10-11',
+        1,
+      ])
+      expect(
+        routines([
+          { i: 'Zero', s: '2026-10-01', e: '2026-10-31', w: 0 },
+          { i: 'Negative', s: '2026-10-01', e: '2026-10-31', w: -3 },
+          { i: 'Missing', s: '2026-10-01', e: '2026-10-31' },
+        ]),
+      ).toEqual([])
+    })
+
+    it('reports whether any routine column is bound', () => {
+      const rows = [{ i: 'A', s: '2026-10-01', e: '2026-10-31', w: 5 }]
+      expect(run(rows)).toMatchObject({ routines: [], hasRoutines: false })
+      expect(run(rows, [], columns, [water]).hasRoutines).toBe(true)
+    })
   })
 })
 

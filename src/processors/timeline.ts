@@ -1,6 +1,6 @@
 import type { CellValue, Column, Entry } from '@/db'
 import { readCell } from './binding'
-import { addDays, localToday, toDayNumber } from './dates'
+import { addDays, fromDayNumber, localToday, toDayNumber } from './dates'
 import type { Processor } from './types'
 
 export type TimelineStatus = 'upcoming' | 'active' | 'ended'
@@ -26,8 +26,18 @@ export interface TimelineItem {
   marks: TimelineMark[]
 }
 
+export interface TimelineRoutine {
+  item: TimelineItem
+  column: Column
+  every: number
+  date: string
+  dueIn: number
+}
+
 export interface TimelineResult {
   items: TimelineItem[]
+  routines: TimelineRoutine[]
+  hasRoutines: boolean
   upcoming: number
   active: number
   ended: number
@@ -41,14 +51,29 @@ function dayCount(value: CellValue | undefined, start: string): number | undefin
   return undefined
 }
 
+const ROUTINES_PER_ITEM = 3
+
+// Occurrences fall every `every` days after the start, up to the end; the start
+// itself is when the item begins, not a repeat of it.
+function nextOccurrences(item: TimelineItem, every: number, now: number): number[] {
+  const start = toDayNumber(item.start)
+  const end = toDayNumber(item.end)
+  const days: number[] = []
+  const first = start + Math.max(1, Math.ceil((now - start) / every)) * every
+  for (let day = first; day <= end && days.length < ROUTINES_PER_ITEM; day += every) days.push(day)
+  return days
+}
+
 export function runTimeline(
   entries: Entry[],
   columns: Record<string, Column>,
   marks: Column[] = [],
+  routineColumns: Column[] = [],
   today = localToday(),
 ): TimelineResult {
   const now = toDayNumber(today)
   const items: TimelineItem[] = []
+  const routines: TimelineRoutine[] = []
 
   for (const entry of entries) {
     const label = String(readCell(entry, columns.item!) ?? '').trim()
@@ -60,7 +85,7 @@ export function runTimeline(
     const startsIn = toDayNumber(start) - now
     const endsIn = startsIn + length - 1
     const elapsed = Math.min(Math.max(1 - startsIn, 0), length)
-    items.push({
+    const item: TimelineItem = {
       entry,
       label,
       start,
@@ -75,12 +100,36 @@ export function runTimeline(
         if (value === undefined || count === undefined) return []
         return [{ column, value, at: Math.min(Math.max(count / length, 0), 1) }]
       }),
-    })
+    }
+    items.push(item)
+
+    for (const column of routineColumns) {
+      const value = readCell(entry, column)
+      if (typeof value !== 'number' || !Number.isFinite(value)) continue
+      const every = Math.ceil(value)
+      if (every < 1) continue
+      for (const day of nextOccurrences(item, every, now)) {
+        routines.push({ item, column, every, date: fromDayNumber(day), dueIn: day - now })
+      }
+    }
   }
 
   items.sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end))
+  routines.sort(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      a.item.label.localeCompare(b.item.label) ||
+      a.column.name.localeCompare(b.column.name),
+  )
   const count = (status: TimelineStatus) => items.filter((item) => item.status === status).length
-  return { items, upcoming: count('upcoming'), active: count('active'), ended: count('ended') }
+  return {
+    items,
+    routines,
+    hasRoutines: routineColumns.length > 0,
+    upcoming: count('upcoming'),
+    active: count('active'),
+    ended: count('ended'),
+  }
 }
 
 export const timeline: Processor<TimelineResult> = {
@@ -92,7 +141,8 @@ export const timeline: Processor<TimelineResult> = {
     { key: 'start', label: 'Start', type: 'date' },
     { key: 'end', label: 'End', type: 'date', alternateTypes: ['number'] },
     { key: 'marks', label: 'Marks', type: 'date', alternateTypes: ['number'], multiple: true },
+    { key: 'routines', label: 'Routines', type: 'number', multiple: true },
   ],
-  run: (entries, columns, multi) => runTimeline(entries, columns, multi?.marks),
+  run: (entries, columns, multi) => runTimeline(entries, columns, multi?.marks, multi?.routines),
   isEmpty: (result) => result.items.length === 0,
 }

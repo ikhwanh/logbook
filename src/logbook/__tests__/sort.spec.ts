@@ -74,6 +74,17 @@ describe('sortEntries', () => {
     ])
   })
 
+  it('sorts days by the earliest day in the week, then the next', () => {
+    const { asc, desc } = setup({ type: 'days' }, ['Tue', undefined, 'Mon,Fri', 'Mon', 'Mon,Wed'])
+    expect(asc()).toEqual(['Mon', 'Mon,Wed', 'Mon,Fri', 'Tue', undefined])
+    expect(desc()).toEqual(['Tue', 'Mon,Fri', 'Mon,Wed', 'Mon', undefined])
+  })
+
+  it('sorts times of day', () => {
+    const { asc } = setup({ type: 'time' }, ['18:00', undefined, '7:30', '09:15'])
+    expect(asc()).toEqual(['7:30', '09:15', '18:00', undefined])
+  })
+
   it('keeps creation order for ties', () => {
     const { desc } = setup({ type: 'text' }, ['b', 'a', 'B'])
     expect(desc()).toEqual(['b', 'B', 'a'])

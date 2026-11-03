@@ -31,4 +31,23 @@ describe('columnTypes.coerce', () => {
     expect(columnTypes.text.coerce(12)).toBe('12')
     expect(columnTypes.select.coerce(true)).toBeUndefined()
   })
+  it('reads 24-hour times as HH:MM', () => {
+    const { coerce } = columnTypes.time
+    expect(coerce('07:30')).toBe('07:30')
+    expect(coerce(' 7:05 ')).toBe('07:05')
+    expect(coerce('23:59:30')).toBe('23:59')
+    expect(coerce('24:00')).toBeUndefined()
+    expect(coerce('7pm')).toBeUndefined()
+    expect(coerce(730)).toBeUndefined()
+  })
+
+  it('reads days of the week into Mon-first order', () => {
+    const { coerce } = columnTypes.days
+    expect(coerce('Fri,Mon,Wed')).toBe('Mon,Wed,Fri')
+    expect(coerce('monday  TUESDAY, sun')).toBe('Mon,Tue,Sun')
+    expect(coerce('Mon,mon')).toBe('Mon')
+    expect(coerce('Mon,Funday')).toBeUndefined()
+    expect(coerce('')).toBeUndefined()
+    expect(coerce(3)).toBeUndefined()
+  })
 })

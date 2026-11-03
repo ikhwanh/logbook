@@ -2,6 +2,7 @@
 import { computed, useTemplateRef, watch } from 'vue'
 import type { CellValue, Column } from '@/db'
 import { columnTypes } from '@/logbook/columnTypes'
+import { formatDays, parseDays, WEEKDAYS } from '@/logbook/weekdays'
 
 const props = defineProps<{ column: Column; value: CellValue | undefined }>()
 const emit = defineEmits<{ commit: [value: CellValue | undefined] }>()
@@ -12,6 +13,11 @@ const coerced = computed(() =>
 )
 const invalid = computed(() => props.value !== undefined && coerced.value === undefined)
 const title = computed(() => (invalid.value ? `Previous value: ${props.value}` : undefined))
+const selectedDays = computed(() =>
+  typeof coerced.value === 'string' && props.column.type === 'days'
+    ? (parseDays(coerced.value) ?? [])
+    : [],
+)
 const unknownOption = computed(() =>
   typeof coerced.value === 'string' && !props.column.options?.includes(coerced.value)
     ? coerced.value
@@ -46,6 +52,18 @@ function commitSelect(event: Event) {
 function commitCheckbox(event: Event) {
   emit('commit', (event.target as HTMLInputElement).checked || undefined)
 }
+
+// The table moves focus by focusing a cell's root, which here is the group.
+function focusFirstDay(event: FocusEvent) {
+  ;(event.currentTarget as HTMLElement).querySelector('button')?.focus()
+}
+
+function toggleDay(day: number) {
+  const days = selectedDays.value.includes(day)
+    ? selectedDays.value.filter((d) => d !== day)
+    : [...selectedDays.value, day].sort((a, b) => a - b)
+  emit('commit', days.length ? formatDays(days) : undefined)
+}
 </script>
 
 <template>
@@ -58,6 +76,31 @@ function commitCheckbox(event: Event) {
     :checked="coerced === true"
     @change="commitCheckbox"
   />
+  <div
+    v-else-if="column.type === 'days'"
+    class="cell days"
+    :class="{ invalid }"
+    :title
+    role="group"
+    :aria-label="column.name"
+    tabindex="-1"
+    @focus="focusFirstDay"
+  >
+    <!-- Enter moves to the next row like in other cells, so it mustn't also toggle. -->
+    <button
+      v-for="(day, index) in WEEKDAYS"
+      :key="day"
+      type="button"
+      class="day"
+      :aria-pressed="selectedDays.includes(index)"
+      :aria-label="day"
+      :title="day"
+      @click="toggleDay(index)"
+      @keydown.enter.prevent
+    >
+      {{ day[0] }}
+    </button>
+  </div>
   <select
     v-else-if="column.type === 'select'"
     class="cell"
@@ -116,6 +159,40 @@ function commitCheckbox(event: Event) {
   margin: 0.6875rem auto;
   padding: 0;
   accent-color: var(--accent);
+}
+
+.cell.days {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  padding: 0.375rem 0.5rem;
+}
+
+.day {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.day[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.day:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 select.cell {

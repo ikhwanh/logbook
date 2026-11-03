@@ -195,6 +195,35 @@ function habitTracker(today: string): ExampleTemplate {
   }
 }
 
+function weeklyRoutines(): ExampleTemplate {
+  const items: [string, string, string, string][] = [
+    ['Gym', 'Mon,Wed,Fri', '18:00', 'Strength on Mon and Fri, cardio on Wed'],
+    ['Read', 'Tue,Thu,Sun', '21:30', '30 minutes before bed'],
+    ['Water plants', 'Mon,Thu', '07:00', 'Balcony and kitchen'],
+    ['Groceries', 'Sat', '07:30', 'Market opens at 7'],
+    ['Meal prep', 'Sun', '16:00', 'Lunches for Mon–Wed'],
+    ['Call parents', 'Sun', '', ''],
+    ['Laundry', 'Wed,Sat', '09:00', 'Whites on Wed, towels on Sat'],
+    ['Stretch', 'Mon,Tue,Wed,Thu,Fri', '06:30', '10 minutes after waking up'],
+  ]
+  return {
+    name: 'Weekly routines',
+    processorId: 'routines',
+    columns: [
+      { id: 'name', name: 'Name', type: 'text' },
+      { id: 'days', name: 'Days', type: 'days' },
+      { id: 'time', name: 'Time', type: 'time' },
+      { id: 'description', name: 'Description', type: 'text' },
+    ],
+    rows: items.map(([name, days, time, description]) => ({
+      name,
+      days,
+      ...(time && { time }),
+      ...(description && { description }),
+    })),
+  }
+}
+
 export function buildExamples(today = localToday()): Record<ProcessorId, ExampleTemplate> {
   return {
     chart: fuelLog(today),
@@ -202,5 +231,6 @@ export function buildExamples(today = localToday()): Record<ProcessorId, Example
     timeline: projects(today),
     totals: expenses(today),
     streaks: habitTracker(today),
+    routines: weeklyRoutines(),
   }
 }

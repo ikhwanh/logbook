@@ -2,12 +2,13 @@ import type { Logbook } from '@/db'
 import { resolveBinding } from './binding'
 import { chart } from './chart'
 import { checklist } from './checklist'
+import { routines } from './routines'
 import { streaks } from './streaks'
 import { timeline } from './timeline'
 import { totals } from './totals'
 import type { Processor, ProcessorId } from './types'
 
-export const processors: Processor[] = [chart, checklist, timeline, totals, streaks]
+export const processors: Processor[] = [chart, checklist, timeline, totals, streaks, routines]
 
 export function findProcessor(id: unknown): Processor | undefined {
   return processors.find((processor) => processor.id === (id as ProcessorId))

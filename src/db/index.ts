@@ -7,7 +7,7 @@ export interface Setting {
   value: unknown
 }
 
-export type ColumnType = 'text' | 'number' | 'select' | 'date' | 'checkbox'
+export type ColumnType = 'text' | 'number' | 'select' | 'date' | 'checkbox' | 'days' | 'time'
 
 export interface Column {
   id: string

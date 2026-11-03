@@ -1,5 +1,6 @@
 import type { CellValue, Column, Entry, Logbook } from '@/db'
 import { columnTypes } from './columnTypes'
+import { parseDays } from './weekdays'
 
 function compareText(a: CellValue, b: CellValue) {
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' })
@@ -11,6 +12,7 @@ function comparator(column: Column): (a: CellValue, b: CellValue) => number {
     case 'checkbox':
       return (a, b) => Number(a) - Number(b)
     case 'date':
+    case 'time':
       return (a, b) => (a < b ? -1 : a > b ? 1 : 0)
     case 'select': {
       // Options the column no longer lists sort after the listed ones.
@@ -20,6 +22,15 @@ function comparator(column: Column): (a: CellValue, b: CellValue) => number {
       }
       return (a, b) => rank(a) - rank(b) || compareText(a, b)
     }
+    case 'days':
+      return (a, b) => {
+        const x = parseDays(String(a)) ?? []
+        const y = parseDays(String(b)) ?? []
+        for (let i = 0; i < Math.min(x.length, y.length); i++) {
+          if (x[i] !== y[i]) return x[i]! - y[i]!
+        }
+        return x.length - y.length
+      }
     case 'text':
       return compareText
   }

@@ -1,4 +1,5 @@
 import type { CellValue, ColumnType } from '@/db'
+import { formatDays, parseDays } from './weekdays'
 
 interface ColumnTypeDef {
   label: string
@@ -10,6 +11,8 @@ interface ColumnTypeDef {
 }
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+// Seconds are allowed because some browsers' time pickers add them; they're dropped.
+const TIME_PATTERN = /^([01]?\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/
 const TRUE_WORDS = new Set(['true', 'yes', 'y', '1', 'x', '✓'])
 const FALSE_WORDS = new Set(['false', 'no', 'n', '0', ''])
 
@@ -49,6 +52,23 @@ export const columnTypes: Record<ColumnType, ColumnTypeDef> = {
       if (TRUE_WORDS.has(word)) return true
       if (FALSE_WORDS.has(word)) return false
       return undefined
+    },
+  },
+  time: {
+    label: 'Time',
+    width: '8rem',
+    coerce: (value) => {
+      const match = typeof value === 'string' ? TIME_PATTERN.exec(value.trim()) : null
+      return match ? `${match[1]!.padStart(2, '0')}:${match[2]}` : undefined
+    },
+  },
+  days: {
+    label: 'Days',
+    width: '13rem',
+    coerce: (value) => {
+      if (typeof value !== 'string') return undefined
+      const days = parseDays(value)
+      return days?.length ? formatDays(days) : undefined
     },
   },
 }

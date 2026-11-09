@@ -1,6 +1,7 @@
 import type { CellValue, Column, ColumnType, Entry } from '@/db'
 
-export type ProcessorId = 'chart' | 'checklist' | 'timeline' | 'totals' | 'streaks' | 'routines'
+export type ProcessorId =
+  'chart' | 'checklist' | 'timeline' | 'totals' | 'streaks' | 'routines' | 'stages'
 
 export interface Slot {
   key: string

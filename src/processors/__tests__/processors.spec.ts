@@ -6,6 +6,7 @@ import { checklist } from '../checklist'
 import { buildExamples } from '../examples'
 import { processors, supportedViews } from '../index'
 import { runRoutines } from '../routines'
+import { runStages, stages } from '../stages'
 import { runStreaks } from '../streaks'
 import { runTimeline, timeline } from '../timeline'
 import { runTotals, totals, type TotalsResult } from '../totals'
@@ -438,6 +439,141 @@ describe('routines', () => {
     expect(
       run([{ n: 'A', d: 'Mon', x: 'hidden' }], withoutDescription).routines[0],
     ).not.toHaveProperty('description')
+  })
+})
+
+describe('stages', () => {
+  const places = ['sprout', 'vegetative', 'generative', 'failed']
+  const columns = {
+    item: col('n', 'text'),
+    date: col('d', 'date'),
+    count: col('c', 'number'),
+    to: { ...col('p', 'select'), options: places },
+    from: { ...col('f', 'select'), options: places },
+  }
+  // 2026-11-24 is today in every case.
+  const run = (rows: Record<string, CellValue>[], cols: Record<string, Column> = columns) =>
+    runStages(entries(rows), cols, '2026-11-24')
+
+  const shallot: Record<string, CellValue>[] = [
+    { n: 'shallot', d: '2026-11-10', c: 10, p: 'sprout' },
+    { n: 'shallot', d: '2026-11-17', c: 6, p: 'vegetative', f: 'sprout' },
+    { n: 'shallot', d: '2026-11-24', c: 3, p: 'vegetative', f: 'sprout' },
+  ]
+
+  it('counts what each place holds and how long it has held it', () => {
+    const result = run(shallot)
+    const item = result.items[0]!
+    expect(item).toMatchObject({ label: 'shallot', planted: '2026-11-10', age: 14, total: 10 })
+    expect(item.holdings.map((h) => [h.place, h.count])).toEqual([
+      ['sprout', 1],
+      ['vegetative', 9],
+    ])
+    expect(item.holdings[1]!.groups.map((g) => [g.count, g.days])).toEqual([
+      [6, 7],
+      [3, 0],
+    ])
+    expect(item.stays).toEqual([
+      { place: 'sprout', to: 'vegetative', count: 9, min: 7, max: 14, average: 28 / 3 },
+    ])
+    expect(result.places.map((p) => [p.name, p.count])).toEqual([
+      ['sprout', 1],
+      ['vegetative', 9],
+      ['generative', 0],
+      ['failed', 0],
+    ])
+    expect(result.places[1]!.items).toEqual([
+      { label: 'shallot', count: 9, minDays: 0, maxDays: 7 },
+    ])
+    expect(result.problems).toEqual([])
+  })
+
+  it('moves the units that arrived first, keeping their planting date', () => {
+    const result = run([
+      { n: 'x', d: '2026-11-01', c: 2, p: 'sprout' },
+      { n: 'x', d: '2026-11-05', c: 2, p: 'sprout' },
+      { n: 'x', d: '2026-11-10', c: 3, p: 'vegetative', f: 'sprout' },
+    ])
+    const [sprout, vegetative] = result.items[0]!.holdings
+    expect(sprout!.groups).toEqual([
+      { count: 1, since: '2026-11-05', planted: '2026-11-05', days: 19 },
+    ])
+    expect(vegetative!.groups.map((g) => [g.count, g.planted])).toEqual([
+      [2, '2026-11-01'],
+      [1, '2026-11-05'],
+    ])
+    expect(result.items[0]!.stays[0]).toMatchObject({ min: 5, max: 9 })
+  })
+
+  it('runs same-day rows in place order whatever order they were typed in', () => {
+    const result = run([
+      { n: 'x', d: '2026-11-01', c: 2, p: 'generative', f: 'vegetative' },
+      { n: 'x', d: '2026-11-01', c: 2, p: 'vegetative', f: 'sprout' },
+      { n: 'x', d: '2026-11-01', c: 2, p: 'sprout' },
+    ])
+    expect(result.problems).toEqual([])
+    expect(result.items[0]!.holdings.map((h) => [h.place, h.count])).toEqual([['generative', 2]])
+  })
+
+  it('flags a row that moves more than the place holds and moves what is there', () => {
+    const result = run([
+      ...shallot,
+      { n: 'shallot', d: '2026-11-24', c: 4, p: 'failed', f: 'sprout' },
+    ])
+    expect(result.problems).toMatchObject([
+      { label: 'shallot', date: '2026-11-24', place: 'sprout', missing: 3 },
+    ])
+    expect(result.items[0]!.holdings.map((h) => [h.place, h.count])).toEqual([
+      ['vegetative', 9],
+      ['failed', 1],
+    ])
+    expect(result.items[0]!.stays.map((stay) => [stay.to, stay.count, stay.average])).toEqual([
+      ['vegetative', 9, 28 / 3],
+      ['failed', 1, 14],
+    ])
+  })
+
+  it('keeps items apart, defaults a missing count to 1 and skips unusable rows', () => {
+    const result = run([
+      { n: 'chili', d: '2026-11-20', p: 'sprout' },
+      { n: 'shallot', d: '2026-11-10', c: 2, p: 'sprout' },
+      { n: ' ', d: '2026-11-10', c: 2, p: 'sprout' },
+      { n: 'bad', d: 'soon', c: 2, p: 'sprout' },
+      { n: 'bad', d: '2026-11-10', c: 0, p: 'sprout' },
+      { n: 'bad', d: '2026-11-10', c: 2 },
+      { n: 'bad', d: '2026-11-10', c: 2, p: 'sprout', f: 'sprout' },
+    ])
+    expect(result.items.map((i) => [i.label, i.total])).toEqual([
+      ['shallot', 2],
+      ['chili', 1],
+    ])
+  })
+
+  it('works without count and from columns, and adds places missing from the options', () => {
+    const result = run([{ n: 'x', d: '2026-11-20', p: 'pot' }], {
+      item: columns.item,
+      date: columns.date,
+      to: columns.to,
+    })
+    expect(result.places.map((p) => p.name)).toEqual([...places, 'pot'])
+    expect(result.items[0]!.holdings).toMatchObject([{ place: 'pot', count: 1 }])
+  })
+
+  it('binds to and from to the select columns in order', () => {
+    const binding = resolveBinding(
+      stages,
+      logbook([
+        col('name', 'text'),
+        col('date', 'date'),
+        col('unit', 'number'),
+        col('place', 'select'),
+        col('from', 'select'),
+      ]),
+    )
+    expect(binding.ok && [binding.columns.to!.id, binding.columns.from!.id]).toEqual([
+      'place',
+      'from',
+    ])
   })
 })
 

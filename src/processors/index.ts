@@ -3,12 +3,21 @@ import { resolveBinding } from './binding'
 import { chart } from './chart'
 import { checklist } from './checklist'
 import { routines } from './routines'
+import { stages } from './stages'
 import { streaks } from './streaks'
 import { timeline } from './timeline'
 import { totals } from './totals'
 import type { Processor, ProcessorId } from './types'
 
-export const processors: Processor[] = [chart, checklist, timeline, totals, streaks, routines]
+export const processors: Processor[] = [
+  chart,
+  checklist,
+  timeline,
+  totals,
+  streaks,
+  routines,
+  stages,
+]
 
 export function findProcessor(id: unknown): Processor | undefined {
   return processors.find((processor) => processor.id === (id as ProcessorId))

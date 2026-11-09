@@ -8,6 +8,7 @@ import type { Processor, ProcessorId, Slot } from '@/processors'
 import ChecklistView from './ChecklistView.vue'
 import LineChart from './LineChart.vue'
 import RoutinesView from './RoutinesView.vue'
+import StagesView from './StagesView.vue'
 import StreaksView from './StreaksView.vue'
 import TimelineView from './TimelineView.vue'
 import TotalsView from './TotalsView.vue'
@@ -21,6 +22,7 @@ const views: Record<ProcessorId, Component> = {
   totals: TotalsView,
   streaks: StreaksView,
   routines: RoutinesView,
+  stages: StagesView,
 }
 
 const binding = computed(() => resolveBinding(props.processor, props.logbook))

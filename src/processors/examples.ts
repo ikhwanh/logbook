@@ -224,6 +224,44 @@ function weeklyRoutines(): ExampleTemplate {
   }
 }
 
+function garden(today: string): ExampleTemplate {
+  const places = ['Sprout', 'Vegetative', 'Generative', 'Harvested', 'Failed']
+  // [plant, days from today, count, place, from]
+  const moves: [string, number, number, string, string][] = [
+    ['Tomato', -95, 3, 'Sprout', ''],
+    ['Tomato', -88, 3, 'Vegetative', 'Sprout'],
+    ['Tomato', -60, 3, 'Generative', 'Vegetative'],
+    ['Shallot A', -40, 10, 'Sprout', ''],
+    ['Shallot A', -33, 6, 'Vegetative', 'Sprout'],
+    ['Shallot A', -26, 3, 'Vegetative', 'Sprout'],
+    ['Shallot A', -26, 1, 'Failed', 'Sprout'],
+    ['Chili', -20, 4, 'Sprout', ''],
+    ['Chili', -12, 4, 'Vegetative', 'Sprout'],
+    ['Tomato', -10, 2, 'Harvested', 'Generative'],
+    ['Shallot A', -5, 6, 'Generative', 'Vegetative'],
+    ['Shallot B', -3, 12, 'Sprout', ''],
+    ['Tomato', -2, 1, 'Harvested', 'Generative'],
+  ]
+  return {
+    name: 'Garden',
+    processorId: 'stages',
+    columns: [
+      { id: 'plant', name: 'Plant', type: 'text' },
+      { id: 'date', name: 'Date', type: 'date' },
+      { id: 'count', name: 'Count', type: 'number' },
+      { id: 'place', name: 'Place', type: 'select', options: places },
+      { id: 'from', name: 'From', type: 'select', options: places },
+    ],
+    rows: moves.map(([plant, days, count, place, from]) => ({
+      plant,
+      date: addDays(today, days),
+      count,
+      place,
+      ...(from && { from }),
+    })),
+  }
+}
+
 export function buildExamples(today = localToday()): Record<ProcessorId, ExampleTemplate> {
   return {
     chart: fuelLog(today),
@@ -232,5 +270,6 @@ export function buildExamples(today = localToday()): Record<ProcessorId, Example
     totals: expenses(today),
     streaks: habitTracker(today),
     routines: weeklyRoutines(),
+    stages: garden(today),
   }
 }
